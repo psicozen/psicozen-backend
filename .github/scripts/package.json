@@ -1,0 +1,11 @@
+{
+  "name": "gpt-code-review",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Gpt AI Code Review Script for GitHub Actions",
+  "private": true,
+  "dependencies": {
+    "openai": "^4.52.0",
+    "node-fetch": "^3.3.2"
+  }
+}
