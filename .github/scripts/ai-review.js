@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 
 /**
- * GPT Code Review Script (OpenAI-based)
+ * Gemini Code Review Script (Google Generative AI)
  * Analisa PRs e retorna um score de 0-100 com feedback objetivo
  */
 
 import fs from 'fs';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Usar fetch nativo ou importar node-fetch se necessário
 // Em Node 20+ fetch é nativo
 const fetch = globalThis.fetch;
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const PR_NUMBER = process.env.PR_NUMBER;
-const OPENAI_MODEL = process.env.OPENAI_MODEL;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
 
 // Variáveis de repositório podem vir de GITHUB_REPOSITORY (owner/repo) ou variáveis explícitas
 const [envRepoOwner, envRepoName] = (process.env.GITHUB_REPOSITORY || '').split('/');
@@ -27,7 +27,7 @@ const REPO_NAME = process.env.REPO_NAME || envRepoName;
  */
 function validateEnvironment() {
   const missingVars = [];
-  if (!OPENAI_API_KEY) missingVars.push('OPENAI_API_KEY');
+  if (!GEMINI_API_KEY) missingVars.push('GEMINI_API_KEY');
   if (!GITHUB_TOKEN) missingVars.push('GITHUB_TOKEN');
   if (!PR_NUMBER) missingVars.push('PR_NUMBER');
   if (!REPO_OWNER) missingVars.push('REPO_OWNER/GITHUB_REPOSITORY');
@@ -56,13 +56,13 @@ function sanitizeErrorMessage(message) {
   }
 
   let sanitized = message;
-  sanitized = sanitized.replace(/sk-[a-zA-Z0-9_-]+/g, '[OPENAI_API_KEY_REDACTED]');
+  sanitized = sanitized.replace(/AIzaSy[a-zA-Z0-9_-]+/g, '[GEMINI_API_KEY_REDACTED]');
   sanitized = sanitized.replace(/gh[psor]_[a-zA-Z0-9_-]+/g, '[GITHUB_TOKEN_REDACTED]');
   sanitized = sanitized.replace(/github_pat_[a-zA-Z0-9_-]+/g, '[GITHUB_TOKEN_REDACTED]');
   sanitized = sanitized.replace(/Bearer\s+[a-zA-Z0-9_-]+/gi, 'Bearer [TOKEN_REDACTED]');
 
-  if (OPENAI_API_KEY && sanitized.includes(OPENAI_API_KEY)) {
-    sanitized = sanitized.split(OPENAI_API_KEY).join('[OPENAI_API_KEY_REDACTED]');
+  if (GEMINI_API_KEY && sanitized.includes(GEMINI_API_KEY)) {
+    sanitized = sanitized.split(GEMINI_API_KEY).join('[GEMINI_API_KEY_REDACTED]');
   }
   if (GITHUB_TOKEN && sanitized.includes(GITHUB_TOKEN)) {
     sanitized = sanitized.split(GITHUB_TOKEN).join('[GITHUB_TOKEN_REDACTED]');
@@ -71,9 +71,7 @@ function sanitizeErrorMessage(message) {
   return sanitized;
 }
 
-const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 /**
  * Busca o diff do PR via GitHub API
@@ -176,7 +174,7 @@ function parseDiffToStructure(diff) {
 }
 
 /**
- * Analisa código usando OpenAI
+ * Analisa código usando Gemini
  */
 async function analyzeCode(diff, prInfo, parsedDiff) {
   const filesContext = parsedDiff.map(file => {
@@ -185,7 +183,7 @@ async function analyzeCode(diff, prInfo, parsedDiff) {
     return `- ${file.filename} (+${addedLines}/-${deletedLines} linhas)`;
   }).join('\n');
 
-  // Ajuste de caminho. Se rodando na raiz do repo, pode ser scripts-ai-reviewer/review-prompt.txt 
+  // Ajuste de caminho. Se rodando na raiz do repo, pode ser scripts-ai-reviewer/review-prompt.txt
   // ou .github/scripts/review-prompt.txt dependendo de onde o user colocou.
   // Vou tentar ler do diretório atual ou de .github/scripts.
   let promptPath = 'scripts-ai-reviewer/review-prompt.txt';
@@ -194,9 +192,9 @@ async function analyzeCode(diff, prInfo, parsedDiff) {
   }
   if (!fs.existsSync(promptPath)) {
      // Fallback para mesmo diretório do script
-     promptPath = new URL('./review-prompt.txt', import.meta.url).pathname; 
+     promptPath = new URL('./review-prompt.txt', import.meta.url).pathname;
   }
-  
+
   // Se ainda assim não achar, erro.
   // Mas como o user disse que está em scripts-ai-reviewer, vou assumir relativo a execução se não achar.
   let promptTemplate;
@@ -216,17 +214,17 @@ async function analyzeCode(diff, prInfo, parsedDiff) {
 
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: OPENAI_MODEL,
-      messages: [
-        { role: "system", content: "You are a helpful assistant designed to output JSON." },
-        { role: 'user', content: prompt }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.2, 
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_MODEL,
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: "application/json",
+      }
     });
 
-    const responseText = completion.choices[0].message.content;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const responseText = response.text();
     const analysis = JSON.parse(responseText);
 
     if (typeof analysis.score !== 'number' ||
@@ -238,7 +236,7 @@ async function analyzeCode(diff, prInfo, parsedDiff) {
     return analysis;
 
   } catch (error) {
-    console.error('❌ Falha ao processar resposta da OpenAI');
+    console.error('❌ Falha ao processar resposta do Gemini');
     throw error;
   }
 }
@@ -259,8 +257,8 @@ async function postReviewWithComments(analysis, prInfo, parsedDiff) {
   const { score, summary, positives, issues } = analysis;
 
   if (!issues || issues.length === 0) {
-    
-    const reviewBody = `<div style="display: flex; align-items: center;"><span style="font-size: 50px;">🤖</span> <h2 style="margin: 0 0 0 10px;">Code Review - Open AI</h2></div>
+
+    const reviewBody = `<div style="display: flex; align-items: center;"><span style="font-size: 50px;">🤖</span> <h2 style="margin: 0 0 0 10px;">Code Review - Gemini AI</h2></div>
 
 **Score: ${score}/100** ✅ Aprovado
 
@@ -270,10 +268,10 @@ ${summary}
 ${positives && positives.length > 0 ? `### ✅ Pontos Positivos\n${positives.map(p => `- ${p}`).join('\n')}` : ''}
 
 ---
-*Revisão automática gerada por Open AI*`;
+*Revisão automática gerada por Gemini AI*`;
 
     const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PR_NUMBER}/reviews`;
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -318,7 +316,7 @@ ${positives && positives.length > 0 ? `### ✅ Pontos Positivos\n${positives.map
   const statusEmoji = score >= 70 ? '✅' : '❌';
   const statusText = score >= 70 ? 'Aprovado' : 'Necessita Ajustes';
 
-  let reviewBody = `<div style="display: flex; align-items: center;"><span style="font-size: 50px;">🤖</span> <h2 style="margin: 0 0 0 10px;">Code Review - Open AI</h2></div>
+  let reviewBody = `<div style="display: flex; align-items: center;"><span style="font-size: 50px;">🤖</span> <h2 style="margin: 0 0 0 10px;">Code Review - Gemini AI</h2></div>
 
 **Score: ${score}/100** ${statusEmoji} ${statusText}
 
@@ -333,16 +331,16 @@ ${summary}`;
   if (issues.length > 0) {
     reviewBody += `\n\n### 🔍 Issues Encontradas (${issues.length})\n\n`;
     reviewBody += `| Severidade | Localização | Tipo | Problema |\n|---|---|---|---|\n`;
-    
+
     issues.forEach(issue => {
         const sev = { error: '🔴', warning: '⚠️', info: 'ℹ️' }[issue.severity] || '📌';
         reviewBody += `| ${sev} ${issue.severity} | \`${issue.file}:${issue.line}\` | ${issue.type} | ${issue.message} |\n`;
     });
-    
+
     reviewBody += `\n💡 **Nota:** Comentários detalhados foram postados inline.\n`;
   }
 
-  reviewBody += `\n\n---\n*Revisão automática gerada por Open AI*`;
+  reviewBody += `\n\n---\n*Revisão automática gerada por Gemini AI*`;
 
   const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PR_NUMBER}/reviews`;
 
@@ -374,12 +372,12 @@ async function main() {
       getPRInfo(),
     ]);
 
-    
+
     const parsedDiff = parseDiffToStructure(diff);
 
     const analysis = await analyzeCode(diff, prInfo, parsedDiff);
 
-    
+
     await postReviewWithComments(analysis, prInfo, parsedDiff);
 
     const githubOutput = process.env.GITHUB_OUTPUT;

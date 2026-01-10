@@ -1,11 +1,11 @@
 {
-  "name": "gpt-code-review",
+  "name": "gemini-code-review",
   "version": "1.0.0",
   "type": "module",
-  "description": "Gpt AI Code Review Script for GitHub Actions",
+  "description": "Gemini AI Code Review Script for GitHub Actions",
   "private": true,
   "dependencies": {
-    "openai": "^4.52.0",
+    "@google/generative-ai": "^0.21.0",
     "node-fetch": "^3.3.2"
   }
 }

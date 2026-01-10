@@ -48,9 +48,9 @@ jobs:
           echo "✅ Build validation passed!"
           echo "✅ Ready for deployment when merged"
 
-  gpt_code_review:
+  gemini_code_review:
     runs-on: ubuntu-latest
-    name: Gpt AI Code Review
+    name: Gemini AI Code Review
     # Validação simples para GitHub Free
     if: github.event.pull_request.head.repo.full_name == github.repository
     timeout-minutes: 10
@@ -71,21 +71,21 @@ jobs:
         working-directory: .github/scripts
         run: npm install --legacy-peer-deps
 
-      - name: Run Gpt Code Review
+      - name: Run Gemini Code Review
         if: github.event.pull_request.head.repo.full_name == github.repository
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
-          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
         run: node .github/scripts/ai-review.js
 
       - name: Review Complete
         if: success()
-        run: echo "✅ Code review completed - Score >= 80"
+        run: echo "✅ Code review completed - Score >= 70"
 
       - name: Review Failed
         if: failure()
-        run: echo "❌ Code review failed - Score < 80"
+        run: echo "❌ Code review failed - Score < 70"
