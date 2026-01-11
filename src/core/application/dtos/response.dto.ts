@@ -22,7 +22,10 @@ export class ApiResponseDto<T> {
     Object.assign(this, partial);
   }
 
-  static ok<T>(data: T, meta?: ApiResponseDto<unknown>['meta']): ApiResponseDto<T> {
+  static ok<T>(
+    data: T,
+    meta?: ApiResponseDto<unknown>['meta'],
+  ): ApiResponseDto<T> {
     return new ApiResponseDto({ success: true, data, meta });
   }
 

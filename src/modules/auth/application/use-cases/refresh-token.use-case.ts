@@ -22,7 +22,9 @@ export class RefreshTokenUseCase {
   }> {
     try {
       // 1. Buscar sessão pelo refresh token
-      const session = await this.sessionRepository.findByToken(dto.refreshToken);
+      const session = await this.sessionRepository.findByToken(
+        dto.refreshToken,
+      );
 
       if (!session || !session.isValid) {
         throw new UnauthorizedException('Invalid refresh token');
@@ -35,7 +37,7 @@ export class RefreshTokenUseCase {
       // 2. Verificar JWT
       let payload: JwtPayload;
       try {
-        payload = this.jwtService.verify(dto.refreshToken) as JwtPayload;
+        payload = this.jwtService.verify(dto.refreshToken);
       } catch {
         throw new UnauthorizedException('Invalid token signature');
       }

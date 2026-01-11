@@ -52,7 +52,8 @@ describe('RolesGuard', () => {
       };
 
       reflector.getAllAndOverride.mockReturnValue(['admin', 'moderator']);
-      const mockGetRequest = mockExecutionContext.switchToHttp().getRequest as jest.Mock;
+      const mockGetRequest = mockExecutionContext.switchToHttp()
+        .getRequest as jest.Mock;
       mockGetRequest.mockReturnValue(mockRequest);
 
       const result = guard.canActivate(mockExecutionContext);
@@ -66,7 +67,8 @@ describe('RolesGuard', () => {
       };
 
       reflector.getAllAndOverride.mockReturnValue(['admin']);
-      const mockGetRequest = mockExecutionContext.switchToHttp().getRequest as jest.Mock;
+      const mockGetRequest = mockExecutionContext.switchToHttp()
+        .getRequest as jest.Mock;
       mockGetRequest.mockReturnValue(mockRequest);
 
       const result = guard.canActivate(mockExecutionContext);
@@ -78,7 +80,8 @@ describe('RolesGuard', () => {
       const mockRequest = {};
 
       reflector.getAllAndOverride.mockReturnValue(['admin']);
-      const mockGetRequest = mockExecutionContext.switchToHttp().getRequest as jest.Mock;
+      const mockGetRequest = mockExecutionContext.switchToHttp()
+        .getRequest as jest.Mock;
       mockGetRequest.mockReturnValue(mockRequest);
 
       const result = guard.canActivate(mockExecutionContext);
@@ -92,7 +95,8 @@ describe('RolesGuard', () => {
       };
 
       reflector.getAllAndOverride.mockReturnValue(['admin', 'moderator']);
-      const mockGetRequest = mockExecutionContext.switchToHttp().getRequest as jest.Mock;
+      const mockGetRequest = mockExecutionContext.switchToHttp()
+        .getRequest as jest.Mock;
       mockGetRequest.mockReturnValue(mockRequest);
 
       const result = guard.canActivate(mockExecutionContext);

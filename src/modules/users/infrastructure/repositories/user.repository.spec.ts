@@ -45,7 +45,12 @@ describe('UserRepository', () => {
         id: 'user-123',
         email: 'test@example.com',
         firstName: 'John',
-        preferences: { language: 'en', theme: 'light', notifications: true, timezone: 'UTC' },
+        preferences: {
+          language: 'en',
+          theme: 'light',
+          notifications: true,
+          timezone: 'UTC',
+        },
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -77,7 +82,12 @@ describe('UserRepository', () => {
         id: 'user-123',
         email: 'test@example.com',
         supabaseUserId: 'supabase-456',
-        preferences: { language: 'en', theme: 'light', notifications: true, timezone: 'UTC' },
+        preferences: {
+          language: 'en',
+          theme: 'light',
+          notifications: true,
+          timezone: 'UTC',
+        },
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -130,7 +140,12 @@ describe('UserRepository', () => {
         lastName: 'Doe',
         photoUrl: 'https://example.com/photo.jpg',
         bio: 'Software developer',
-        preferences: { language: 'en', theme: 'dark', notifications: true, timezone: 'UTC' },
+        preferences: {
+          language: 'en',
+          theme: 'dark',
+          notifications: true,
+          timezone: 'UTC',
+        },
         supabaseUserId: 'supabase-456',
         isActive: true,
         lastLoginAt: new Date('2024-01-01'),
@@ -151,7 +166,11 @@ describe('UserRepository', () => {
 
   describe('toEntity', () => {
     it('should convert domain to schema', () => {
-      const domain = UserEntity.create('test@example.com', 'supabase-123', 'John');
+      const domain = UserEntity.create(
+        'test@example.com',
+        'supabase-123',
+        'John',
+      );
       domain.id = 'user-123';
       domain.lastName = 'Doe';
 

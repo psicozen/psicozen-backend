@@ -19,7 +19,11 @@ describe('UserEntity', () => {
     });
 
     it('should create user with supabaseUserId and firstName', () => {
-      const user = UserEntity.create('test@example.com', 'supabase-123', 'John');
+      const user = UserEntity.create(
+        'test@example.com',
+        'supabase-123',
+        'John',
+      );
 
       expect(user.supabaseUserId).toBe('supabase-123');
       expect(user.firstName).toBe('John');

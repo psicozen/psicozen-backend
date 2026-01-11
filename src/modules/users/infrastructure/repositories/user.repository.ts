@@ -58,7 +58,9 @@ export class UserRepository
     return schema ? this.toDomain(schema) : null;
   }
 
-  async findBySupabaseUserId(supabaseUserId: string): Promise<UserEntity | null> {
+  async findBySupabaseUserId(
+    supabaseUserId: string,
+  ): Promise<UserEntity | null> {
     const schema = await this.repository.findOne({
       where: { supabaseUserId },
     });

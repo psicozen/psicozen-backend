@@ -12,7 +12,9 @@ export class ListUsersUseCase {
     private readonly userRepository: IUserRepository,
   ) {}
 
-  async execute(pagination: PaginationDto): Promise<PaginatedResult<UserEntity>> {
+  async execute(
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<UserEntity>> {
     const options = {
       skip: pagination.skip,
       take: pagination.take,

@@ -17,7 +17,8 @@ export class SupabaseStorageService {
     mimeType: string,
     isPublic: boolean = false,
   ): Promise<{ path: string; url: string }> {
-    const { data, error } = await this.supabaseService.getStorage()
+    const { data, error } = await this.supabaseService
+      .getStorage()
       .from(this.bucketName)
       .upload(filePath, buffer, {
         contentType: mimeType,
@@ -36,7 +37,8 @@ export class SupabaseStorageService {
   }
 
   async delete(filePath: string): Promise<void> {
-    const { error } = await this.supabaseService.getStorage()
+    const { error } = await this.supabaseService
+      .getStorage()
       .from(this.bucketName)
       .remove([filePath]);
 
@@ -46,15 +48,20 @@ export class SupabaseStorageService {
   }
 
   getPublicUrl(filePath: string): string {
-    const { data } = this.supabaseService.getStorage()
+    const { data } = this.supabaseService
+      .getStorage()
       .from(this.bucketName)
       .getPublicUrl(filePath);
 
     return data.publicUrl;
   }
 
-  async getSignedUrl(filePath: string, expiresIn: number = 3600): Promise<string> {
-    const { data, error } = await this.supabaseService.getStorage()
+  async getSignedUrl(
+    filePath: string,
+    expiresIn: number = 3600,
+  ): Promise<string> {
+    const { data, error } = await this.supabaseService
+      .getStorage()
       .from(this.bucketName)
       .createSignedUrl(filePath, expiresIn);
 
