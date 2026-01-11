@@ -437,4 +437,241 @@ describe('OrganizationEntity', () => {
       expect(org.slug).toBeUndefined();
     });
   });
+
+  describe('updateDetails', () => {
+    it('should update name successfully', () => {
+      const org = OrganizationEntity.create({
+        name: 'Original Name',
+        type: 'company',
+      });
+
+      org.updateDetails({ name: 'New Name' });
+
+      expect(org.name).toBe('New Name');
+    });
+
+    it('should update slug when provided', () => {
+      const org = OrganizationEntity.create({
+        name: 'Test Org',
+        type: 'company',
+      });
+
+      org.updateDetails({ slug: 'custom-slug' });
+
+      expect(org.slug).toBe('custom-slug');
+    });
+
+    it('should update both name and slug', () => {
+      const org = OrganizationEntity.create({
+        name: 'Original',
+        type: 'company',
+      });
+
+      org.updateDetails({ name: 'Updated Name', slug: 'updated-slug' });
+
+      expect(org.name).toBe('Updated Name');
+      expect(org.slug).toBe('updated-slug');
+    });
+
+    it('should call touch on update', () => {
+      const org = OrganizationEntity.create({
+        name: 'Test Org',
+        type: 'company',
+      });
+      const originalUpdatedAt = org.updatedAt;
+
+      jest.useFakeTimers();
+      jest.advanceTimersByTime(1000);
+
+      org.updateDetails({ name: 'New Name' });
+
+      expect(org.updatedAt.getTime()).toBeGreaterThanOrEqual(
+        originalUpdatedAt.getTime(),
+      );
+
+      jest.useRealTimers();
+    });
+
+    it('should throw ValidationException when name is too short', () => {
+      const org = OrganizationEntity.create({
+        name: 'Test Org',
+        type: 'company',
+      });
+
+      expect(() => {
+        org.updateDetails({ name: 'AB' });
+      }).toThrow(ValidationException);
+
+      try {
+        org.updateDetails({ name: 'AB' });
+      } catch (error) {
+        expect((error as ValidationException).errors.name).toContain(
+          'O nome da organização deve ter entre 3 e 100 caracteres',
+        );
+      }
+    });
+
+    it('should throw ValidationException when name is too long', () => {
+      const org = OrganizationEntity.create({
+        name: 'Test Org',
+        type: 'company',
+      });
+      const longName = 'A'.repeat(101);
+
+      expect(() => {
+        org.updateDetails({ name: longName });
+      }).toThrow(ValidationException);
+    });
+
+    it('should not update anything when empty object is passed', () => {
+      const org = OrganizationEntity.create({
+        name: 'Original Name',
+        type: 'company',
+      });
+      const originalName = org.name;
+      const originalSlug = org.slug;
+
+      org.updateDetails({});
+
+      expect(org.name).toBe(originalName);
+      expect(org.slug).toBe(originalSlug);
+    });
+  });
+
+  describe('activate', () => {
+    it('should set isActive to true', () => {
+      const org = OrganizationEntity.create({
+        name: 'Test Org',
+        type: 'company',
+      });
+
+      org.deactivate();
+      expect(org.isActive).toBe(false);
+
+      org.activate();
+      expect(org.isActive).toBe(true);
+    });
+
+    it('should call touch on activate', () => {
+      const org = OrganizationEntity.create({
+        name: 'Test Org',
+        type: 'company',
+      });
+      org.deactivate();
+
+      const originalUpdatedAt = org.updatedAt;
+
+      jest.useFakeTimers();
+      jest.advanceTimersByTime(1000);
+
+      org.activate();
+
+      expect(org.updatedAt.getTime()).toBeGreaterThanOrEqual(
+        originalUpdatedAt.getTime(),
+      );
+
+      jest.useRealTimers();
+    });
+
+    it('should work on already active organization', () => {
+      const org = OrganizationEntity.create({
+        name: 'Test Org',
+        type: 'company',
+      });
+
+      expect(org.isActive).toBe(true);
+      org.activate();
+      expect(org.isActive).toBe(true);
+    });
+  });
+
+  describe('isRoot', () => {
+    it('should return true when parentId is undefined', () => {
+      const org = OrganizationEntity.create({
+        name: 'Root Org',
+        type: 'company',
+      });
+
+      expect(org.isRoot()).toBe(true);
+    });
+
+    it('should return true when parentId is null', () => {
+      const org = new OrganizationEntity({
+        name: 'Root Org',
+        slug: 'root-org',
+        type: 'company',
+        parentId: null,
+        settings: DEFAULT_ORGANIZATION_SETTINGS,
+        isActive: true,
+      });
+
+      expect(org.isRoot()).toBe(true);
+    });
+
+    it('should return false when parentId exists', () => {
+      const org = OrganizationEntity.create({
+        name: 'Child Org',
+        type: 'department',
+        parentId: 'parent-uuid-123',
+      });
+
+      expect(org.isRoot()).toBe(false);
+    });
+  });
+
+  describe('setParent', () => {
+    it('should set parentId', () => {
+      const org = OrganizationEntity.create({
+        name: 'Test Org',
+        type: 'department',
+      });
+
+      org.setParent('new-parent-uuid');
+
+      expect(org.parentId).toBe('new-parent-uuid');
+    });
+
+    it('should allow setting parentId to null', () => {
+      const org = OrganizationEntity.create({
+        name: 'Test Org',
+        type: 'department',
+        parentId: 'original-parent',
+      });
+
+      org.setParent(null);
+
+      expect(org.parentId).toBeNull();
+    });
+
+    it('should call touch when setting parent', () => {
+      const org = OrganizationEntity.create({
+        name: 'Test Org',
+        type: 'department',
+      });
+      const originalUpdatedAt = org.updatedAt;
+
+      jest.useFakeTimers();
+      jest.advanceTimersByTime(1000);
+
+      org.setParent('parent-uuid');
+
+      expect(org.updatedAt.getTime()).toBeGreaterThanOrEqual(
+        originalUpdatedAt.getTime(),
+      );
+
+      jest.useRealTimers();
+    });
+
+    it('should allow changing parent', () => {
+      const org = OrganizationEntity.create({
+        name: 'Test Org',
+        type: 'team',
+        parentId: 'old-parent',
+      });
+
+      org.setParent('new-parent');
+
+      expect(org.parentId).toBe('new-parent');
+    });
+  });
 });

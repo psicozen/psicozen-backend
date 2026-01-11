@@ -1,10 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { BaseEntity } from '../../../../core/domain/entities/base.entity';
 import { ValidationException } from '../../../../core/domain/exceptions/validation.exception';
 import {
   OrganizationSettings,
   OrganizationType,
   DEFAULT_ORGANIZATION_SETTINGS,
-  VALID_ORGANIZATION_TYPES,
+  isValidOrganizationType,
 } from '../types/organization-settings.types';
 
 /**
@@ -43,7 +45,7 @@ export class OrganizationEntity extends BaseEntity {
     }
 
     // Validate type
-    if (!VALID_ORGANIZATION_TYPES.includes(data.type)) {
+    if (!isValidOrganizationType(data.type)) {
       throw new ValidationException({
         type: ['Tipo de organização inválido'],
       });
@@ -67,12 +69,49 @@ export class OrganizationEntity extends BaseEntity {
   }
 
   /**
+   * Update organization details (name and slug)
+   */
+  updateDetails(data: { name?: string; slug?: string }): void {
+    if (data.name) {
+      if (data.name.length < 3 || data.name.length > 100) {
+        throw new ValidationException({
+          name: ['O nome da organização deve ter entre 3 e 100 caracteres'],
+        });
+      }
+      this.name = data.name;
+    }
+    if (data.slug) {
+      this.slug = data.slug;
+    }
+    this.touch();
+  }
+
+  /**
    * Updates organization settings with validation
    */
   updateSettings(partial: Partial<OrganizationSettings>): void {
     OrganizationEntity.validateSettings(partial);
-    this.settings = { ...this.settings, ...partial };
+    // Type-safe merge using individual property assignment
+    this.settings = this.mergeSettings(this.settings, partial);
     this.touch();
+  }
+
+  /**
+   * Merges settings with validation ensuring type-safety
+   */
+  private mergeSettings(
+    current: OrganizationSettings,
+    updates: Partial<OrganizationSettings>,
+  ): OrganizationSettings {
+    return {
+      timezone: updates.timezone ?? current.timezone,
+      locale: updates.locale ?? current.locale,
+      emociogramaEnabled:
+        updates.emociogramaEnabled ?? current.emociogramaEnabled,
+      alertThreshold: updates.alertThreshold ?? current.alertThreshold,
+      dataRetentionDays: updates.dataRetentionDays ?? current.dataRetentionDays,
+      anonymityDefault: updates.anonymityDefault ?? current.anonymityDefault,
+    };
   }
 
   /**
@@ -81,6 +120,29 @@ export class OrganizationEntity extends BaseEntity {
   deactivate(): void {
     this.isActive = false;
     this.markAsDeleted();
+  }
+
+  /**
+   * Activates the organization
+   */
+  activate(): void {
+    this.isActive = true;
+    this.touch();
+  }
+
+  /**
+   * Check if organization is a root (no parent)
+   */
+  isRoot(): boolean {
+    return this.parentId === null || this.parentId === undefined;
+  }
+
+  /**
+   * Change parent organization
+   */
+  setParent(parentId: string | null): void {
+    this.parentId = parentId;
+    this.touch();
   }
 
   /**
@@ -96,7 +158,7 @@ export class OrganizationEntity extends BaseEntity {
   }
 
   /**
-   * Validates settings values
+   * Validates settings values with type-safe property access
    */
   private static validateSettings(
     settings: Partial<OrganizationSettings>,
@@ -105,16 +167,21 @@ export class OrganizationEntity extends BaseEntity {
 
     // Validate alert threshold
     if (settings.alertThreshold !== undefined) {
-      if (settings.alertThreshold < 1 || settings.alertThreshold > 10) {
-        errors.alertThreshold = [
-          'O limite de alerta deve estar entre 1 e 10',
-        ];
+      if (typeof settings.alertThreshold !== 'number') {
+        errors.alertThreshold = ['O limite de alerta deve ser um número'];
+      } else if (settings.alertThreshold < 1 || settings.alertThreshold > 10) {
+        errors.alertThreshold = ['O limite de alerta deve estar entre 1 e 10'];
       }
     }
 
     // Validate data retention days
     if (settings.dataRetentionDays !== undefined) {
-      if (settings.dataRetentionDays < 1 || settings.dataRetentionDays > 3650) {
+      if (typeof settings.dataRetentionDays !== 'number') {
+        errors.dataRetentionDays = ['O período de retenção deve ser um número'];
+      } else if (
+        settings.dataRetentionDays < 1 ||
+        settings.dataRetentionDays > 3650
+      ) {
         errors.dataRetentionDays = [
           'A retenção de dados deve estar entre 1 e 3650 dias',
         ];
