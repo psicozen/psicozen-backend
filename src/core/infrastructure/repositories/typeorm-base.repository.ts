@@ -26,7 +26,7 @@ export abstract class TypeOrmBaseRepository<
 
   async findById(id: string): Promise<TDomain | null> {
     const entity = await this.repository.findOne({
-      where: { id } as unknown as FindOptionsWhere<TEntity>,
+      where: { id } as FindOptionsWhere<TEntity>,
     });
     return entity ? this.toDomain(entity) : null;
   }
@@ -62,10 +62,10 @@ export abstract class TypeOrmBaseRepository<
   async update(id: string, partial: Partial<TDomain>): Promise<TDomain> {
     await this.repository.update(
       id,
-      this.toEntity(partial) as unknown as QueryDeepPartialEntity<TEntity>,
+      this.toEntity(partial) as QueryDeepPartialEntity<TEntity>,
     );
     const updated = await this.repository.findOne({
-      where: { id } as unknown as FindOptionsWhere<TEntity>,
+      where: { id } as FindOptionsWhere<TEntity>,
     });
 
     if (!updated) {
