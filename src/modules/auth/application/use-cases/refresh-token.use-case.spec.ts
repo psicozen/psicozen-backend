@@ -3,7 +3,10 @@ import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { RefreshTokenUseCase } from './refresh-token.use-case';
-import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository.interface';
+import {
+  ISessionRepository,
+  SESSION_REPOSITORY,
+} from '../../domain/repositories/session.repository.interface';
 import { SessionEntity } from '../../domain/entities/session.entity';
 
 describe('RefreshTokenUseCase', () => {
@@ -95,35 +98,37 @@ describe('RefreshTokenUseCase', () => {
 
       sessionRepository.findByToken.mockResolvedValue(null);
 
-      await expect(useCase.execute(dto)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(useCase.execute(dto)).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException for expired token', async () => {
       const dto = { refreshToken: 'expired-token' };
 
-      const expiredSession = SessionEntity.create('user-123', dto.refreshToken, -100);
+      const expiredSession = SessionEntity.create(
+        'user-123',
+        dto.refreshToken,
+        -100,
+      );
       expiredSession.isValid = true;
 
       sessionRepository.findByToken.mockResolvedValue(expiredSession);
 
-      await expect(useCase.execute(dto)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(useCase.execute(dto)).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException for revoked token', async () => {
       const dto = { refreshToken: 'revoked-token' };
 
-      const revokedSession = SessionEntity.create('user-123', dto.refreshToken, 604800);
+      const revokedSession = SessionEntity.create(
+        'user-123',
+        dto.refreshToken,
+        604800,
+      );
       revokedSession.isValid = false;
 
       sessionRepository.findByToken.mockResolvedValue(revokedSession);
 
-      await expect(useCase.execute(dto)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(useCase.execute(dto)).rejects.toThrow(UnauthorizedException);
     });
   });
 });

@@ -67,9 +67,14 @@ describe('EmailService', () => {
 
   describe('sendMagicLink', () => {
     it('should send magic link email', async () => {
-      const sendSpy = jest.spyOn(service, 'send').mockResolvedValue({ id: 'email-123' });
+      const sendSpy = jest
+        .spyOn(service, 'send')
+        .mockResolvedValue({ id: 'email-123' });
 
-      await service.sendMagicLink('user@example.com', 'https://example.com/verify?token=abc');
+      await service.sendMagicLink(
+        'user@example.com',
+        'https://example.com/verify?token=abc',
+      );
 
       expect(sendSpy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -82,7 +87,9 @@ describe('EmailService', () => {
     });
 
     it('should include link in email content', async () => {
-      const sendSpy = jest.spyOn(service, 'send').mockResolvedValue({ id: 'email-123' });
+      const sendSpy = jest
+        .spyOn(service, 'send')
+        .mockResolvedValue({ id: 'email-123' });
       const link = 'https://example.com/verify?token=xyz';
 
       await service.sendMagicLink('user@example.com', link);
@@ -97,7 +104,9 @@ describe('EmailService', () => {
 
   describe('sendWelcome', () => {
     it('should send welcome email with first name', async () => {
-      const sendSpy = jest.spyOn(service, 'send').mockResolvedValue({ id: 'email-123' });
+      const sendSpy = jest
+        .spyOn(service, 'send')
+        .mockResolvedValue({ id: 'email-123' });
 
       await service.sendWelcome('user@example.com', 'John');
 
@@ -115,7 +124,9 @@ describe('EmailService', () => {
     });
 
     it('should send welcome email without first name', async () => {
-      const sendSpy = jest.spyOn(service, 'send').mockResolvedValue({ id: 'email-123' });
+      const sendSpy = jest
+        .spyOn(service, 'send')
+        .mockResolvedValue({ id: 'email-123' });
 
       await service.sendWelcome('user@example.com');
 

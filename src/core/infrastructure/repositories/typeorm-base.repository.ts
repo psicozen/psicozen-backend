@@ -16,12 +16,16 @@ export abstract class TypeOrmBaseRepository<TEntity, TDomain>
   abstract toEntity(domain: Partial<TDomain>): TEntity;
 
   async findById(id: string): Promise<TDomain | null> {
-    const entity = await this.repository.findOne({ where: { id } as unknown as FindOptionsWhere<TEntity> });
+    const entity = await this.repository.findOne({
+      where: { id } as unknown as FindOptionsWhere<TEntity>,
+    });
     return entity ? this.toDomain(entity) : null;
   }
 
   async findAll(options?: FindOptions): Promise<PaginatedResult<TDomain>> {
-    const page = options?.skip ? Math.floor(options.skip / (options.take || 10)) + 1 : 1;
+    const page = options?.skip
+      ? Math.floor(options.skip / (options.take || 10)) + 1
+      : 1;
     const limit = options?.take || 10;
 
     const [entities, total] = await this.repository.findAndCount({
@@ -47,8 +51,13 @@ export abstract class TypeOrmBaseRepository<TEntity, TDomain>
   }
 
   async update(id: string, partial: Partial<TDomain>): Promise<TDomain> {
-    await this.repository.update(id, this.toEntity(partial) as unknown as QueryDeepPartialEntity<TEntity>);
-    const updated = await this.repository.findOne({ where: { id } as unknown as FindOptionsWhere<TEntity> });
+    await this.repository.update(
+      id,
+      this.toEntity(partial) as unknown as QueryDeepPartialEntity<TEntity>,
+    );
+    const updated = await this.repository.findOne({
+      where: { id } as unknown as FindOptionsWhere<TEntity>,
+    });
 
     if (!updated) {
       throw new NotFoundException('Entity', id);

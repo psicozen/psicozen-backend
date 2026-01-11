@@ -66,9 +66,7 @@ describe('SendMagicLinkUseCase', () => {
         error: { message: 'Invalid email' },
       } as any);
 
-      await expect(useCase.execute(dto)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(useCase.execute(dto)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException on unexpected error', async () => {
@@ -80,9 +78,7 @@ describe('SendMagicLinkUseCase', () => {
         new Error('Network error'),
       );
 
-      await expect(useCase.execute(dto)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(useCase.execute(dto)).rejects.toThrow(BadRequestException);
     });
   });
 });

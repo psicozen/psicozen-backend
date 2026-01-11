@@ -63,7 +63,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify magic link token and generate JWT' })
   @ApiQuery({ name: 'token_hash', type: String })
   @ApiQuery({ name: 'type', type: String })
-  @ApiResponse({ status: 200, description: 'Authentication successful', type: AuthResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Authentication successful',
+    type: AuthResponseDto,
+  })
   @ApiResponse({ status: 401, description: 'Invalid or expired magic link' })
   async verifyMagicLink(
     @Query() dto: VerifyMagicLinkDto,
@@ -98,7 +102,10 @@ export class AuthController {
     schema: {
       type: 'object',
       properties: {
-        refreshToken: { type: 'string', description: 'Optional: specific session to logout' },
+        refreshToken: {
+          type: 'string',
+          description: 'Optional: specific session to logout',
+        },
       },
     },
     required: false,

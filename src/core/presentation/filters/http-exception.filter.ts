@@ -7,7 +7,11 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { DomainException, NotFoundException, ValidationException } from '../../domain/exceptions';
+import {
+  DomainException,
+  NotFoundException,
+  ValidationException,
+} from '../../domain/exceptions';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -29,7 +33,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       } else {
-        const body = exceptionResponse as { message?: string | string[]; errors?: unknown };
+        const body = exceptionResponse as {
+          message?: string | string[];
+          errors?: unknown;
+        };
         message = body.message || message;
         errors = body.errors;
       }
@@ -68,6 +75,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   private sanitizeUrl(url: string): string {
     // Remove sensitive query parameters
-    return url.replace(/([?&])(token_hash|token|refresh_token|access_token)=[^&]*/gi, '$1$2=***');
+    return url.replace(
+      /([?&])(token_hash|token|refresh_token|access_token)=[^&]*/gi,
+      '$1$2=***',
+    );
   }
 }

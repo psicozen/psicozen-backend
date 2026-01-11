@@ -37,7 +37,8 @@ import { SupabaseModule } from '../../core/infrastructure/supabase/supabase.modu
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const expiresIn = configService.get<string>('JWT_ACCESS_TOKEN_EXPIRATION') || '15m';
+        const expiresIn =
+          configService.get<string>('JWT_ACCESS_TOKEN_EXPIRATION') || '15m';
         return {
           secret: configService.get<string>('JWT_SECRET'),
           signOptions: {
@@ -69,10 +70,6 @@ import { SupabaseModule } from '../../core/infrastructure/supabase/supabase.modu
     RefreshTokenUseCase,
     LogoutUseCase,
   ],
-  exports: [
-    JwtAuthGuard,
-    SESSION_REPOSITORY,
-    JwtModule,
-  ],
+  exports: [JwtAuthGuard, SESSION_REPOSITORY, JwtModule],
 })
 export class AuthModule {}
