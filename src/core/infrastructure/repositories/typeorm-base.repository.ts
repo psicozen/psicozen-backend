@@ -7,8 +7,17 @@ import {
 } from '../../domain/repositories/base.repository.interface';
 import { NotFoundException } from '../../domain/exceptions';
 
-export abstract class TypeOrmBaseRepository<TEntity, TDomain>
-  implements IBaseRepository<TDomain>
+/**
+ * Interface para entidades que possuem um campo id
+ */
+interface EntityWithId {
+  id: string;
+}
+
+export abstract class TypeOrmBaseRepository<
+  TEntity extends EntityWithId,
+  TDomain,
+> implements IBaseRepository<TDomain>
 {
   constructor(protected readonly repository: Repository<TEntity>) {}
 
@@ -31,7 +40,7 @@ export abstract class TypeOrmBaseRepository<TEntity, TDomain>
     const [entities, total] = await this.repository.findAndCount({
       skip: options?.skip,
       take: options?.take,
-      order: options?.orderBy as unknown as FindOptionsOrder<TEntity>,
+      order: options?.orderBy as FindOptionsOrder<TEntity>,
       where: options?.where,
     });
 
