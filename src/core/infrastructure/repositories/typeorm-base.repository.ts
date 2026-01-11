@@ -7,8 +7,17 @@ import {
 } from '../../domain/repositories/base.repository.interface';
 import { NotFoundException } from '../../domain/exceptions';
 
-export abstract class TypeOrmBaseRepository<TEntity, TDomain>
-  implements IBaseRepository<TDomain>
+/**
+ * Interface para entidades que possuem um campo id
+ */
+interface EntityWithId {
+  id: string;
+}
+
+export abstract class TypeOrmBaseRepository<
+  TEntity extends EntityWithId,
+  TDomain,
+> implements IBaseRepository<TDomain>
 {
   constructor(protected readonly repository: Repository<TEntity>) {}
 
@@ -17,7 +26,7 @@ export abstract class TypeOrmBaseRepository<TEntity, TDomain>
 
   async findById(id: string): Promise<TDomain | null> {
     const entity = await this.repository.findOne({
-      where: { id } as unknown as FindOptionsWhere<TEntity>,
+      where: { id } as FindOptionsWhere<TEntity>,
     });
     return entity ? this.toDomain(entity) : null;
   }
@@ -31,7 +40,7 @@ export abstract class TypeOrmBaseRepository<TEntity, TDomain>
     const [entities, total] = await this.repository.findAndCount({
       skip: options?.skip,
       take: options?.take,
-      order: options?.orderBy as unknown as FindOptionsOrder<TEntity>,
+      order: options?.orderBy as FindOptionsOrder<TEntity>,
       where: options?.where,
     });
 
@@ -53,10 +62,10 @@ export abstract class TypeOrmBaseRepository<TEntity, TDomain>
   async update(id: string, partial: Partial<TDomain>): Promise<TDomain> {
     await this.repository.update(
       id,
-      this.toEntity(partial) as unknown as QueryDeepPartialEntity<TEntity>,
+      this.toEntity(partial) as QueryDeepPartialEntity<TEntity>,
     );
     const updated = await this.repository.findOne({
-      where: { id } as unknown as FindOptionsWhere<TEntity>,
+      where: { id } as FindOptionsWhere<TEntity>,
     });
 
     if (!updated) {
