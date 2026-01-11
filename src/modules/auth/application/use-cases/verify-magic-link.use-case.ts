@@ -45,7 +45,7 @@ export class VerifyMagicLinkUseCase {
       if (!user) {
         user = await this.userRepository.create(
           UserEntity.create(
-            data.user.email!,
+            data.user.email,
             data.user.id,
             data.user.user_metadata?.firstName,
           ),

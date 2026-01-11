@@ -153,13 +153,27 @@ export class AddRlsToUsersTable1768105100000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop RLS policies
-    await queryRunner.query(`DROP POLICY IF EXISTS users_delete_policy ON users;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS users_update_admin_policy ON users;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS users_update_own_policy ON users;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS users_insert_policy ON users;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS users_select_permission_policy ON users;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS users_select_admin_policy ON users;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS users_select_own_policy ON users;`);
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS users_delete_policy ON users;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS users_update_admin_policy ON users;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS users_update_own_policy ON users;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS users_insert_policy ON users;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS users_select_permission_policy ON users;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS users_select_admin_policy ON users;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS users_select_own_policy ON users;`,
+    );
 
     // Disable RLS
     await queryRunner.query(`ALTER TABLE users DISABLE ROW LEVEL SECURITY;`);

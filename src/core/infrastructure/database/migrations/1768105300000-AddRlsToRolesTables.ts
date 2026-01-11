@@ -244,30 +244,66 @@ export class AddRlsToRolesTables1768105300000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop user_roles policies
-    await queryRunner.query(`DROP POLICY IF EXISTS user_roles_delete_policy ON user_roles;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS user_roles_insert_policy ON user_roles;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS user_roles_select_admin_policy ON user_roles;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS user_roles_select_own_policy ON user_roles;`);
-    await queryRunner.query(`ALTER TABLE user_roles DISABLE ROW LEVEL SECURITY;`);
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS user_roles_delete_policy ON user_roles;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS user_roles_insert_policy ON user_roles;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS user_roles_select_admin_policy ON user_roles;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS user_roles_select_own_policy ON user_roles;`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE user_roles DISABLE ROW LEVEL SECURITY;`,
+    );
 
     // Drop role_permissions policies
-    await queryRunner.query(`DROP POLICY IF EXISTS role_permissions_delete_policy ON role_permissions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS role_permissions_insert_policy ON role_permissions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS role_permissions_select_policy ON role_permissions;`);
-    await queryRunner.query(`ALTER TABLE role_permissions DISABLE ROW LEVEL SECURITY;`);
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS role_permissions_delete_policy ON role_permissions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS role_permissions_insert_policy ON role_permissions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS role_permissions_select_policy ON role_permissions;`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE role_permissions DISABLE ROW LEVEL SECURITY;`,
+    );
 
     // Drop permissions policies
-    await queryRunner.query(`DROP POLICY IF EXISTS permissions_delete_policy ON permissions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS permissions_update_policy ON permissions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS permissions_insert_policy ON permissions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS permissions_select_policy ON permissions;`);
-    await queryRunner.query(`ALTER TABLE permissions DISABLE ROW LEVEL SECURITY;`);
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS permissions_delete_policy ON permissions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS permissions_update_policy ON permissions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS permissions_insert_policy ON permissions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS permissions_select_policy ON permissions;`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE permissions DISABLE ROW LEVEL SECURITY;`,
+    );
 
     // Drop roles policies
-    await queryRunner.query(`DROP POLICY IF EXISTS roles_delete_policy ON roles;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS roles_update_policy ON roles;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS roles_insert_policy ON roles;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS roles_select_policy ON roles;`);
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS roles_delete_policy ON roles;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS roles_update_policy ON roles;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS roles_insert_policy ON roles;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS roles_select_policy ON roles;`,
+    );
     await queryRunner.query(`ALTER TABLE roles DISABLE ROW LEVEL SECURITY;`);
   }
 }

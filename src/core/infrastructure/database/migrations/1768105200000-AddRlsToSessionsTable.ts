@@ -126,14 +126,30 @@ export class AddRlsToSessionsTable1768105200000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop RLS policies
-    await queryRunner.query(`DROP POLICY IF EXISTS sessions_delete_admin_policy ON sessions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS sessions_delete_own_policy ON sessions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS sessions_update_admin_policy ON sessions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS sessions_update_own_policy ON sessions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS sessions_insert_admin_policy ON sessions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS sessions_insert_own_policy ON sessions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS sessions_select_admin_policy ON sessions;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS sessions_select_own_policy ON sessions;`);
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS sessions_delete_admin_policy ON sessions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS sessions_delete_own_policy ON sessions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS sessions_update_admin_policy ON sessions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS sessions_update_own_policy ON sessions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS sessions_insert_admin_policy ON sessions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS sessions_insert_own_policy ON sessions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS sessions_select_admin_policy ON sessions;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS sessions_select_own_policy ON sessions;`,
+    );
 
     // Disable RLS
     await queryRunner.query(`ALTER TABLE sessions DISABLE ROW LEVEL SECURITY;`);

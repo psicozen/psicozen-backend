@@ -4,8 +4,14 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { VerifyMagicLinkUseCase } from './verify-magic-link.use-case';
 import { SupabaseService } from '../../../../core/infrastructure/supabase/supabase.service';
-import { IUserRepository, USER_REPOSITORY } from '../../../users/domain/repositories/user.repository.interface';
-import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository.interface';
+import {
+  IUserRepository,
+  USER_REPOSITORY,
+} from '../../../users/domain/repositories/user.repository.interface';
+import {
+  ISessionRepository,
+  SESSION_REPOSITORY,
+} from '../../domain/repositories/session.repository.interface';
 import { UserEntity } from '../../../users/domain/entities/user.entity';
 
 describe('VerifyMagicLinkUseCase', () => {
@@ -168,9 +174,7 @@ describe('VerifyMagicLinkUseCase', () => {
         error: { message: 'Invalid token' },
       } as any);
 
-      await expect(useCase.execute(dto)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(useCase.execute(dto)).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException when Supabase user is null', async () => {
@@ -184,9 +188,7 @@ describe('VerifyMagicLinkUseCase', () => {
         error: null,
       } as any);
 
-      await expect(useCase.execute(dto)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(useCase.execute(dto)).rejects.toThrow(UnauthorizedException);
     });
   });
 });

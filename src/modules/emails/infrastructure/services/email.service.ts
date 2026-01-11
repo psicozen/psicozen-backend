@@ -26,7 +26,10 @@ export class EmailService {
       return { id: 'mock-id' };
     }
 
-    const from = this.configService.get<string>('EMAIL_FROM', 'noreply@example.com');
+    const from = this.configService.get<string>(
+      'EMAIL_FROM',
+      'noreply@example.com',
+    );
 
     const { data, error } = await this.resend.emails.send({
       from,
@@ -40,7 +43,7 @@ export class EmailService {
       throw new Error(`Failed to send email: ${error.message}`);
     }
 
-    return { id: data!.id };
+    return { id: data.id };
   }
 
   async sendMagicLink(email: string, link: string): Promise<void> {
