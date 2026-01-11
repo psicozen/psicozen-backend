@@ -1,8 +1,6 @@
 import { IBaseRepository } from '../../../../core/domain/repositories/base.repository.interface';
-import {
-  OrganizationEntity,
-  OrganizationType,
-} from '../entities/organization.entity';
+import { OrganizationEntity } from '../entities/organization.entity';
+import { OrganizationType } from '../types/organization-settings.types';
 
 /**
  * Interface de repositório para operações de persistência de organização
