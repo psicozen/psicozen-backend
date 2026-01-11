@@ -103,31 +103,14 @@ export class OrganizationEntity extends BaseEntity {
     current: OrganizationSettings,
     updates: Partial<OrganizationSettings>,
   ): OrganizationSettings {
-    const currentRecord = current as Record<
-      keyof OrganizationSettings,
-      unknown
-    >;
-    const updatesRecord = updates as Record<string, unknown>;
-
     return {
-      timezone:
-        (updatesRecord.timezone as string | undefined) ??
-        (currentRecord.timezone as string),
-      locale:
-        (updatesRecord.locale as string | undefined) ??
-        (currentRecord.locale as string),
+      timezone: updates.timezone ?? current.timezone,
+      locale: updates.locale ?? current.locale,
       emociogramaEnabled:
-        (updatesRecord.emociogramaEnabled as boolean | undefined) ??
-        (currentRecord.emociogramaEnabled as boolean),
-      alertThreshold:
-        (updatesRecord.alertThreshold as number | undefined) ??
-        (currentRecord.alertThreshold as number),
-      dataRetentionDays:
-        (updatesRecord.dataRetentionDays as number | undefined) ??
-        (currentRecord.dataRetentionDays as number),
-      anonymityDefault:
-        (updatesRecord.anonymityDefault as boolean | undefined) ??
-        (currentRecord.anonymityDefault as boolean),
+        updates.emociogramaEnabled ?? current.emociogramaEnabled,
+      alertThreshold: updates.alertThreshold ?? current.alertThreshold,
+      dataRetentionDays: updates.dataRetentionDays ?? current.dataRetentionDays,
+      anonymityDefault: updates.anonymityDefault ?? current.anonymityDefault,
     };
   }
 
@@ -181,35 +164,27 @@ export class OrganizationEntity extends BaseEntity {
     settings: Partial<OrganizationSettings>,
   ): void {
     const errors: Record<string, string[]> = {};
-    const settingsRecord = settings as Record<string, unknown>;
 
-    // Validate alert threshold with explicit type narrowing
-    if ('alertThreshold' in settingsRecord) {
-      const value = settingsRecord.alertThreshold;
-      if (value !== undefined) {
-        if (typeof value !== 'number') {
-          errors.alertThreshold = ['O limite de alerta deve ser um número'];
-        } else if (value < 1 || value > 10) {
-          errors.alertThreshold = [
-            'O limite de alerta deve estar entre 1 e 10',
-          ];
-        }
+    // Validate alert threshold
+    if (settings.alertThreshold !== undefined) {
+      if (typeof settings.alertThreshold !== 'number') {
+        errors.alertThreshold = ['O limite de alerta deve ser um número'];
+      } else if (settings.alertThreshold < 1 || settings.alertThreshold > 10) {
+        errors.alertThreshold = ['O limite de alerta deve estar entre 1 e 10'];
       }
     }
 
-    // Validate data retention days with explicit type narrowing
-    if ('dataRetentionDays' in settingsRecord) {
-      const value = settingsRecord.dataRetentionDays;
-      if (value !== undefined) {
-        if (typeof value !== 'number') {
-          errors.dataRetentionDays = [
-            'O período de retenção deve ser um número',
-          ];
-        } else if (value < 1 || value > 3650) {
-          errors.dataRetentionDays = [
-            'A retenção de dados deve estar entre 1 e 3650 dias',
-          ];
-        }
+    // Validate data retention days
+    if (settings.dataRetentionDays !== undefined) {
+      if (typeof settings.dataRetentionDays !== 'number') {
+        errors.dataRetentionDays = ['O período de retenção deve ser um número'];
+      } else if (
+        settings.dataRetentionDays < 1 ||
+        settings.dataRetentionDays > 3650
+      ) {
+        errors.dataRetentionDays = [
+          'A retenção de dados deve estar entre 1 e 3650 dias',
+        ];
       }
     }
 
