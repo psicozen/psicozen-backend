@@ -249,18 +249,34 @@ export class CreateOrganizationsTable1768105009236
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop RLS policies
-    await queryRunner.query(`DROP POLICY IF EXISTS organizations_delete_policy ON organizations;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS organizations_update_policy ON organizations;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS organizations_insert_policy ON organizations;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS organizations_select_admin_policy ON organizations;`);
-    await queryRunner.query(`DROP POLICY IF EXISTS organizations_select_policy ON organizations;`);
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS organizations_delete_policy ON organizations;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS organizations_update_policy ON organizations;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS organizations_insert_policy ON organizations;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS organizations_select_admin_policy ON organizations;`,
+    );
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS organizations_select_policy ON organizations;`,
+    );
 
     // Drop helper functions
-    await queryRunner.query(`DROP FUNCTION IF EXISTS public.user_has_permission(UUID, TEXT);`);
-    await queryRunner.query(`DROP FUNCTION IF EXISTS public.user_has_role(UUID, TEXT);`);
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS public.user_has_permission(UUID, TEXT);`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS public.user_has_role(UUID, TEXT);`,
+    );
 
     // Disable RLS
-    await queryRunner.query(`ALTER TABLE organizations DISABLE ROW LEVEL SECURITY;`);
+    await queryRunner.query(
+      `ALTER TABLE organizations DISABLE ROW LEVEL SECURITY;`,
+    );
 
     // Drop table (automatically drops indexes, constraints, and foreign keys)
     await queryRunner.dropTable('organizations');

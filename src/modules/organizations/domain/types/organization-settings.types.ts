@@ -1,4 +1,27 @@
 /**
+ * Organization type enum matching database constraint
+ */
+export type OrganizationType = 'company' | 'department' | 'team';
+
+/**
+ * Valid organization types array for validation
+ */
+export const VALID_ORGANIZATION_TYPES = [
+  'company',
+  'department',
+  'team',
+] as const;
+
+/**
+ * Type guard to check if a value is a valid OrganizationType
+ */
+export function isValidOrganizationType(
+  value: string,
+): value is OrganizationType {
+  return (VALID_ORGANIZATION_TYPES as readonly string[]).includes(value);
+}
+
+/**
  * Configurações específicas da organização para recursos e conformidade
  */
 export interface OrganizationSettings {
