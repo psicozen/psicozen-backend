@@ -14,10 +14,10 @@ export const validationSchema = Joi.object({
   DB_PASSWORD: Joi.string().required(),
   DB_DATABASE: Joi.string().required(),
 
-  // Supabase
+  // Supabase (NEW API Keys - NOT Legacy!)
   SUPABASE_URL: Joi.string().uri().required(),
-  SUPABASE_ANON_KEY: Joi.string().required(),
-  SUPABASE_SERVICE_ROLE_KEY: Joi.string().required(),
+  SUPABASE_PUBLISHABLE_KEY: Joi.string().required(),
+  SUPABASE_SECRET_KEY: Joi.string().required(),
   SUPABASE_JWT_SECRET: Joi.string().required(),
 
   // JWT

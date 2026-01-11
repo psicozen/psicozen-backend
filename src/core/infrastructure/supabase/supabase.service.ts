@@ -13,10 +13,10 @@ export class SupabaseService {
     @Inject(REQUEST) private readonly request: Request,
   ) {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
-    const supabaseKey = this.configService.get<string>('SUPABASE_ANON_KEY');
+    const supabaseKey = this.configService.get<string>('SUPABASE_PUBLISHABLE_KEY');
 
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase URL and ANON_KEY must be defined');
+      throw new Error('Supabase URL and PUBLISHABLE_KEY must be defined');
     }
 
     this.supabase = createClient(supabaseUrl, supabaseKey, {
