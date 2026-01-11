@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LogoutUseCase } from './logout.use-case';
-import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository.interface';
+import {
+  ISessionRepository,
+  SESSION_REPOSITORY,
+} from '../../domain/repositories/session.repository.interface';
 
 describe('LogoutUseCase', () => {
   let useCase: LogoutUseCase;

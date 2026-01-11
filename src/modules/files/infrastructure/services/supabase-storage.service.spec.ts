@@ -142,7 +142,10 @@ describe('SupabaseStorageService', () => {
 
       await service.getSignedUrl('file.pdf', 7200);
 
-      expect(mockStorage.createSignedUrl).toHaveBeenCalledWith('file.pdf', 7200);
+      expect(mockStorage.createSignedUrl).toHaveBeenCalledWith(
+        'file.pdf',
+        7200,
+      );
     });
 
     it('should throw error when signed URL creation fails', async () => {

@@ -11,7 +11,10 @@ import type { UserPreferences } from '../../domain/entities/user.entity';
 
 @Entity('users')
 @Index(['email'], { unique: true })
-@Index(['supabaseUserId'], { unique: true, where: 'supabase_user_id IS NOT NULL' })
+@Index(['supabaseUserId'], {
+  unique: true,
+  where: 'supabase_user_id IS NOT NULL',
+})
 export class UserSchema {
   @PrimaryGeneratedColumn('uuid')
   id: string;

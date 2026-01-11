@@ -2,7 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtStrategy, JwtPayload } from './jwt.strategy';
-import { IUserRepository, USER_REPOSITORY } from '../../../users/domain/repositories/user.repository.interface';
+import {
+  IUserRepository,
+  USER_REPOSITORY,
+} from '../../../users/domain/repositories/user.repository.interface';
 import { UserEntity } from '../../../users/domain/entities/user.entity';
 
 describe('JwtStrategy', () => {
@@ -48,7 +51,11 @@ describe('JwtStrategy', () => {
         supabaseUserId: 'supabase-123',
       };
 
-      const mockUser = UserEntity.create('test@example.com', 'supabase-123', 'Test');
+      const mockUser = UserEntity.create(
+        'test@example.com',
+        'supabase-123',
+        'Test',
+      );
       mockUser.id = 'user-123';
       mockUser.isActive = true;
 
@@ -76,7 +83,9 @@ describe('JwtStrategy', () => {
       await expect(strategy.validate(payload)).rejects.toThrow(
         UnauthorizedException,
       );
-      await expect(strategy.validate(payload)).rejects.toThrow('User not found');
+      await expect(strategy.validate(payload)).rejects.toThrow(
+        'User not found',
+      );
     });
 
     it('should throw UnauthorizedException when user is inactive', async () => {
@@ -94,7 +103,9 @@ describe('JwtStrategy', () => {
       await expect(strategy.validate(payload)).rejects.toThrow(
         UnauthorizedException,
       );
-      await expect(strategy.validate(payload)).rejects.toThrow('User is inactive');
+      await expect(strategy.validate(payload)).rejects.toThrow(
+        'User is inactive',
+      );
     });
   });
 });

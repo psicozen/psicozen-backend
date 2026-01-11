@@ -21,7 +21,10 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../core/presentation/decorators/current-user.decorator';
-import { PaginationDto, ApiResponseDto } from '../../../../core/application/dtos';
+import {
+  PaginationDto,
+  ApiResponseDto,
+} from '../../../../core/application/dtos';
 import {
   CreateUserUseCase,
   UpdateUserUseCase,
@@ -51,7 +54,11 @@ export class UsersController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new user' })
-  @ApiResponse({ status: 201, description: 'User created successfully', type: UserResponseDto })
+  @ApiResponse({
+    status: 201,
+    description: 'User created successfully',
+    type: UserResponseDto,
+  })
   @ApiResponse({ status: 409, description: 'User with email already exists' })
   async create(@Body() dto: CreateUserDto) {
     const user = await this.createUserUseCase.execute(dto);
@@ -86,7 +93,11 @@ export class UsersController {
   @Get(':id')
   @ApiOperation({ summary: 'Get user by ID' })
   @ApiParam({ name: 'id', type: String })
-  @ApiResponse({ status: 200, description: 'User found', type: UserResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'User found',
+    type: UserResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   async findOne(@Param('id') id: string) {
     const user = await this.getUserUseCase.execute(id);

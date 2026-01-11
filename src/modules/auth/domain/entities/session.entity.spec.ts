@@ -36,10 +36,18 @@ describe('SessionEntity', () => {
       const now = new Date();
       const expiresInSeconds = 3600; // 1 hour
 
-      const session = SessionEntity.create('user-123', 'token', expiresInSeconds);
+      const session = SessionEntity.create(
+        'user-123',
+        'token',
+        expiresInSeconds,
+      );
 
-      const expectedExpiration = new Date(now.getTime() + expiresInSeconds * 1000);
-      const timeDiff = Math.abs(session.expiresAt.getTime() - expectedExpiration.getTime());
+      const expectedExpiration = new Date(
+        now.getTime() + expiresInSeconds * 1000,
+      );
+      const timeDiff = Math.abs(
+        session.expiresAt.getTime() - expectedExpiration.getTime(),
+      );
 
       expect(timeDiff).toBeLessThan(1000); // Less than 1 second difference
     });
@@ -79,7 +87,9 @@ describe('SessionEntity', () => {
       session.revoke();
 
       expect(session.isValid).toBe(false);
-      expect(session.updatedAt.getTime()).toBeGreaterThan(beforeRevoke.getTime());
+      expect(session.updatedAt.getTime()).toBeGreaterThan(
+        beforeRevoke.getTime(),
+      );
     });
 
     it('should allow revoking already revoked session', () => {

@@ -6,7 +6,10 @@ export interface UserPayload {
   role?: string;
 }
 
-export const CurrentUserFactory = (data: keyof UserPayload | undefined, ctx: ExecutionContext): UserPayload | any => {
+export const CurrentUserFactory = (
+  data: keyof UserPayload | undefined,
+  ctx: ExecutionContext,
+): UserPayload | any => {
   const request = ctx.switchToHttp().getRequest();
   const user = request.user;
 

@@ -41,7 +41,9 @@ async function bootstrap() {
   // Swagger Documentation
   const config = new DocumentBuilder()
     .setTitle('PsicoZen API')
-    .setDescription('Clean Architecture backend with NestJS, TypeORM and Supabase')
+    .setDescription(
+      'Clean Architecture backend with NestJS, TypeORM and Supabase',
+    )
     .setVersion('1.0')
     .addBearerAuth(
       {

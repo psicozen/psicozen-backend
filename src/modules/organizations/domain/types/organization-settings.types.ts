@@ -1,35 +1,48 @@
 /**
- * Organization Settings Interface
- * Defines configurable settings for an organization
+ * Configurações específicas da organização para recursos e conformidade
  */
 export interface OrganizationSettings {
-  /**
-   * Alert threshold for notifications (1-10)
-   * Higher values = less sensitive alerts
-   */
+  /** Fuso horário para exibição de data/hora (identificador IANA) */
+  timezone: string;
+
+  /** Localidade para internacionalização (tag de idioma BCP 47) */
+  locale: string;
+
+  /** Ativar/desativar o recurso Emociograma para esta organização */
+  emociogramaEnabled: boolean;
+
+  /** Limite do estado emocional para disparar alertas (escala 1-10) */
   alertThreshold: number;
 
-  /**
-   * Number of days to retain data (1-3650)
-   */
+  /** Período de retenção de dados em dias (conformidade LGPD) */
   dataRetentionDays: number;
+
+  /** Configuração padrão de anonimato para envios */
+  anonymityDefault: boolean;
 }
 
 /**
- * Default organization settings
+ * Configurações padrão da organização
  */
 export const DEFAULT_ORGANIZATION_SETTINGS: OrganizationSettings = {
-  alertThreshold: 5,
+  timezone: 'America/Sao_Paulo',
+  locale: 'pt-BR',
+  emociogramaEnabled: true,
+  alertThreshold: 6,
   dataRetentionDays: 365,
+  anonymityDefault: false,
 };
 
 /**
- * Organization type enum values
+ * Factory para criar configurações de organização com valores padrão
+ * @param overrides - Propriedades para sobrescrever os valores padrão
+ * @returns Configurações completas da organização
  */
-export type OrganizationType = 'company' | 'department' | 'team';
-
-export const VALID_ORGANIZATION_TYPES: OrganizationType[] = [
-  'company',
-  'department',
-  'team',
-];
+export function createOrganizationSettings(
+  overrides?: Partial<OrganizationSettings>,
+): OrganizationSettings {
+  return {
+    ...DEFAULT_ORGANIZATION_SETTINGS,
+    ...overrides,
+  };
+}
