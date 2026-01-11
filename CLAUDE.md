@@ -341,28 +341,161 @@ Located in: `src/core/infrastructure/database/migrations/`
 - `sessions` - Refresh token whitelist
 - `roles`, `permissions`, `role_permissions`, `user_roles` - RBAC system
 - `files` - File metadata (Supabase Storage integration)
+- `organizations` - Multi-tenant organization hierarchy **with RLS**
 
 **Commands:**
 ```bash
-# Generate migration (manual)
-npm run typeorm migration:create src/core/infrastructure/database/migrations/MigrationName
+# Create migration (manual)
+npm run migration:create src/core/infrastructure/database/migrations/MigrationName
 
 # Run migrations
-npm run typeorm migration:run
+npm run migration:run
 
 # Revert last migration
-npm run typeorm migration:revert
+npm run migration:revert
+
+# Show migration status
+npm run migration:show
 ```
+
+---
+
+## 🔐 Row Level Security (RLS) - MANDATORY RULE
+
+**🚨 CRITICAL REQUIREMENT**: Every migration that creates a new table **MUST** include RLS policies.
+
+**Why RLS is Required:**
+- **Security First**: Protects data at the database level, not just application level
+- **Multi-Tenancy**: Essential for organization/tenant isolation
+- **Defense in Depth**: Even if application logic fails, database enforces access control
+- **Supabase Integration**: Works seamlessly with Supabase Auth (`auth.uid()`)
+
+### Standard RLS Implementation Pattern
+
+```typescript
+// In migration up() method after creating table:
+
+// 1. Enable RLS
+await queryRunner.query(`
+  ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
+`);
+
+// 2. Create helper functions in public schema (CREATE OR REPLACE - idempotent)
+// NOTE: Use 'public' schema, not 'auth' (auth is reserved by Supabase)
+await queryRunner.query(`
+  CREATE OR REPLACE FUNCTION public.user_has_role(p_user_id UUID, p_role_name TEXT)
+  RETURNS BOOLEAN AS $$
+  BEGIN
+    RETURN EXISTS (
+      SELECT 1 FROM user_roles ur
+      JOIN roles r ON r.id = ur.role_id
+      WHERE ur.user_id = p_user_id AND r.name = p_role_name
+    );
+  END;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+`);
+
+await queryRunner.query(`
+  CREATE OR REPLACE FUNCTION public.user_has_permission(p_user_id UUID, p_permission_name TEXT)
+  RETURNS BOOLEAN AS $$
+  BEGIN
+    RETURN EXISTS (
+      SELECT 1 FROM user_roles ur
+      JOIN role_permissions rp ON rp.role_id = ur.role_id
+      JOIN permissions p ON p.id = rp.permission_id
+      WHERE ur.user_id = p_user_id AND p.name = p_permission_name
+    );
+  END;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+`);
+
+// 3. SELECT policies (basic + admin)
+await queryRunner.query(`
+  CREATE POLICY table_select_policy ON table_name
+    FOR SELECT
+    USING (
+      auth.uid() IS NOT NULL
+      AND is_active = true
+      AND deleted_at IS NULL
+    );
+`);
+
+await queryRunner.query(`
+  CREATE POLICY table_select_admin_policy ON table_name
+    FOR SELECT
+    USING (
+      EXISTS (
+        SELECT 1 FROM users u
+        WHERE u.supabase_user_id = auth.uid()
+          AND public.user_has_role(u.id, 'admin')
+      )
+    );
+`);
+
+// 4. INSERT, UPDATE, DELETE policies
+await queryRunner.query(`
+  CREATE POLICY table_insert_policy ON table_name
+    FOR INSERT WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM users u
+        WHERE u.supabase_user_id = auth.uid()
+          AND (public.user_has_role(u.id, 'admin') OR public.user_has_permission(u.id, 'table:create'))
+      )
+    );
+`);
+
+// In migration down() method:
+await queryRunner.query(`DROP POLICY IF EXISTS table_delete_policy ON table_name;`);
+await queryRunner.query(`DROP POLICY IF EXISTS table_update_policy ON table_name;`);
+await queryRunner.query(`DROP POLICY IF EXISTS table_insert_policy ON table_name;`);
+await queryRunner.query(`DROP POLICY IF EXISTS table_select_admin_policy ON table_name;`);
+await queryRunner.query(`DROP POLICY IF EXISTS table_select_policy ON table_name;`);
+await queryRunner.query(`DROP FUNCTION IF EXISTS public.user_has_permission(UUID, TEXT);`);
+await queryRunner.query(`DROP FUNCTION IF EXISTS public.user_has_role(UUID, TEXT);`);
+await queryRunner.query(`ALTER TABLE table_name DISABLE ROW LEVEL SECURITY;`);
+```
+
+### RLS Naming Conventions
+
+**Policies:**
+- `{table}_select_policy` - Basic SELECT for authenticated users
+- `{table}_select_admin_policy` - Admin SELECT (view all)
+- `{table}_insert_policy` - INSERT permissions
+- `{table}_update_policy` - UPDATE permissions
+- `{table}_delete_policy` - DELETE permissions
+
+**Permissions:**
+- `{resource}:create` (e.g., `organizations:create`)
+- `{resource}:read`
+- `{resource}:update`
+- `{resource}:delete`
+
+### Testing RLS Policies
+
+```sql
+-- Test as specific user (in psql or DB client)
+SET LOCAL auth.uid = 'user-supabase-uuid-here';
+SELECT * FROM table_name; -- Should only see allowed rows
+
+-- Reset to default
+RESET auth.uid;
+```
+
+**Reference Implementation:** See `1768105009236-CreateOrganizationsTable.ts` for complete RLS example.
 
 ---
 
 ## Environment Variables
 
 Required variables (see `.env.example`):
-- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`
-- `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`
-- `JWT_SECRET` (min 32 chars), `JWT_ACCESS_TOKEN_EXPIRATION`, `JWT_REFRESH_TOKEN_EXPIRATION`
-- `RESEND_API_KEY`, `EMAIL_FROM`
+- **Supabase (NEW API Keys - NOT Legacy!):**
+  - `SUPABASE_URL` - Project URL
+  - `SUPABASE_PUBLISHABLE_KEY` - Publishable key (sb_publishable_...)
+  - `SUPABASE_SECRET_KEY` - Secret key (sb_secret_...)
+  - `SUPABASE_JWT_SECRET` - JWT Signing Key (ECC P-256)
+- **Database:** `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`
+- **JWT Backend:** `JWT_SECRET` (min 32 chars), `JWT_ACCESS_TOKEN_EXPIRATION`, `JWT_REFRESH_TOKEN_EXPIRATION`
+- **Email:** `RESEND_API_KEY`, `EMAIL_FROM`
 
 ---
 
