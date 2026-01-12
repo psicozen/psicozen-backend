@@ -19,6 +19,7 @@ import { UsersModule } from './modules/users/users.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { FilesModule } from './modules/files/files.module';
 import { EmailsModule } from './modules/emails/emails.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
 
 // Legacy (to be removed)
 import { AppController } from './app.controller';
@@ -57,6 +58,7 @@ import { AppService } from './app.service';
     RolesModule,
     FilesModule,
     EmailsModule,
+    OrganizationsModule,
   ],
   controllers: [AppController],
   providers: [
