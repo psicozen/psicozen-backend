@@ -1,6 +1,10 @@
 import { Role } from './role.enum';
 
 describe('Role Enum', () => {
+  it('should have SUPER_ADMIN role', () => {
+    expect(Role.SUPER_ADMIN).toBe('super_admin');
+  });
+
   it('should have ADMIN role', () => {
     expect(Role.ADMIN).toBe('admin');
   });
@@ -13,9 +17,9 @@ describe('Role Enum', () => {
     expect(Role.USER).toBe('user');
   });
 
-  it('should have exactly 3 roles', () => {
+  it('should have exactly 4 roles', () => {
     const roles = Object.values(Role);
-    expect(roles).toHaveLength(3);
+    expect(roles).toHaveLength(4);
   });
 
   it('should only contain string values', () => {
