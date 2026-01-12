@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { BaseEntity } from '../../../../core/domain/entities/base.entity';
 import { ValidationException } from '../../../../core/domain/exceptions/validation.exception';
 import {
