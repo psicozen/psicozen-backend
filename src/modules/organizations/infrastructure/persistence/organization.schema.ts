@@ -14,6 +14,8 @@ import type {
   OrganizationType,
 } from '../../domain/types/organization-settings.types';
 
+const isTestEnvironment = process.env.NODE_ENV === 'test';
+
 @Entity('organizations')
 @Index(['slug'], { unique: true })
 @Index(['parentId'])
@@ -31,7 +33,10 @@ export class OrganizationSchema {
   @Column({ length: 50 })
   type: OrganizationType;
 
-  @Column({ type: 'simple-json', default: '{}' })
+  @Column({
+    type: isTestEnvironment ? 'simple-json' : 'jsonb',
+    default: isTestEnvironment ? '{}' : {},
+  })
   settings: OrganizationSettings;
 
   @Column({ name: 'parent_id', nullable: true })

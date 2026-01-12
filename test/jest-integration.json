@@ -6,6 +6,7 @@
     "^.+\\.ts$": "ts-jest"
   },
   "testEnvironment": "node",
+  "setupFiles": ["<rootDir>/set-test-env.ts"],
   "setupFilesAfterEnv": ["<rootDir>/setup-integration.ts"],
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/../src/$1"
