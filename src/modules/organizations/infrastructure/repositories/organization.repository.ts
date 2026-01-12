@@ -60,6 +60,7 @@ export class OrganizationRepository
   async findChildren(parentId: string): Promise<OrganizationEntity[]> {
     const schemas = await this.repository.find({
       where: { parentId, deletedAt: IsNull() },
+      order: { createdAt: 'ASC' },
     });
     return schemas.map((schema) => this.toDomain(schema));
   }
@@ -73,6 +74,7 @@ export class OrganizationRepository
         isActive: true,
         deletedAt: IsNull(),
       },
+      order: { name: 'ASC' },
     });
     return schemas.map((schema) => this.toDomain(schema));
   }
