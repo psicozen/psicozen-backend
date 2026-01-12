@@ -13,6 +13,8 @@
       "Bash(npm run test:cov:*)",
       "Bash(npm install:*)",
       "Bash(npm run test:integration:*)"
+      "Bash(npm run test:cov:*)",
+      "Bash(ls:*)"
     ]
   }
 }

@@ -400,3 +400,6 @@ Temporary Items
 dist
 .webpack
 .serverless/**/*.zip
+
+# Claude Code temp files
+tmpclaude*
