@@ -146,7 +146,7 @@ describe('OrganizationRepository Integration Tests', () => {
       await typeormRepository.save(hierarchy.department1);
       await typeormRepository.save(hierarchy.department2);
 
-      const children = await repository.findChildren(hierarchy.company.id!);
+      const children = await repository.findChildren(hierarchy.company.id);
 
       expect(children).toHaveLength(2);
       expect(children.map((c) => c.name)).toContain('Engineering');
@@ -157,7 +157,7 @@ describe('OrganizationRepository Integration Tests', () => {
       const fixture = createCompanyFixture({ name: 'Lonely Company' });
       await typeormRepository.save(fixture);
 
-      const children = await repository.findChildren(fixture.id!);
+      const children = await repository.findChildren(fixture.id);
 
       expect(children).toEqual([]);
     });
@@ -187,7 +187,7 @@ describe('OrganizationRepository Integration Tests', () => {
       child3.createdAt = new Date('2024-01-03');
       await typeormRepository.save(child3);
 
-      const children = await repository.findChildren(parent.id!);
+      const children = await repository.findChildren(parent.id);
 
       expect(children).toHaveLength(3);
       expect(children[0].name).toBe('First Department');
@@ -212,7 +212,7 @@ describe('OrganizationRepository Integration Tests', () => {
       });
       await typeormRepository.save(deletedChild);
 
-      const children = await repository.findChildren(parent.id!);
+      const children = await repository.findChildren(parent.id);
 
       expect(children).toHaveLength(1);
       expect(children[0].name).toBe('Active Department');
@@ -324,7 +324,7 @@ describe('OrganizationRepository Integration Tests', () => {
       const fixture = createCompanyFixture({ name: 'Find By ID Test' });
       await typeormRepository.save(fixture);
 
-      const result = await repository.findById(fixture.id!);
+      const result = await repository.findById(fixture.id);
 
       expect(result).toBeDefined();
       expect(result?.id).toBe(fixture.id);
@@ -345,7 +345,9 @@ describe('OrganizationRepository Integration Tests', () => {
       const fixture = createCompanyFixture({ name: 'Original Name' });
       await typeormRepository.save(fixture);
 
-      const updated = await repository.update(fixture.id!, { name: 'New Name' });
+      const updated = await repository.update(fixture.id, {
+        name: 'New Name',
+      });
 
       expect(updated.name).toBe('New Name');
     });
@@ -357,7 +359,7 @@ describe('OrganizationRepository Integration Tests', () => {
       });
       await typeormRepository.save(fixture);
 
-      const updated = await repository.update(fixture.id!, {
+      const updated = await repository.update(fixture.id, {
         name: 'Updated',
         isActive: false,
       });
@@ -372,7 +374,7 @@ describe('OrganizationRepository Integration Tests', () => {
       const fixture = createCompanyFixture({ name: 'To Delete' });
       await typeormRepository.save(fixture);
 
-      await repository.delete(fixture.id!);
+      await repository.delete(fixture.id);
 
       const found = await typeormRepository.findOne({
         where: { id: fixture.id },
@@ -386,7 +388,7 @@ describe('OrganizationRepository Integration Tests', () => {
       const fixture = createCompanyFixture({ name: 'To Soft Delete' });
       await typeormRepository.save(fixture);
 
-      await repository.softDelete(fixture.id!);
+      await repository.softDelete(fixture.id);
 
       const found = await typeormRepository.findOne({
         where: { id: fixture.id },
@@ -406,7 +408,7 @@ describe('OrganizationRepository Integration Tests', () => {
       });
       await typeormRepository.save(fixture);
 
-      const result = await repository.findById(fixture.id!);
+      const result = await repository.findById(fixture.id);
 
       expect(result).toBeInstanceOf(OrganizationEntity);
       expect(result?.name).toBe('Mapping Test');
@@ -420,7 +422,7 @@ describe('OrganizationRepository Integration Tests', () => {
       const fixture = createCompanyFixture({ name: 'Settings Test' });
       await typeormRepository.save(fixture);
 
-      const result = await repository.findById(fixture.id!);
+      const result = await repository.findById(fixture.id);
 
       expect(result?.settings).toBeDefined();
       expect(result?.settings.timezone).toBe('America/Sao_Paulo');
