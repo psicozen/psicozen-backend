@@ -127,10 +127,19 @@ export class AddOrganizationScopeToRBACTables1768105400000
     `);
 
     // Add new unique constraint (user_id, role_id, organization_id)
-    // Using COALESCE to handle NULL organization_id for system roles
+    // Use two partial indexes to properly handle NULL organization_id
+    // Index for organization-scoped assignments (organization_id IS NOT NULL)
     await queryRunner.query(`
       CREATE UNIQUE INDEX "UQ_user_roles_user_role_org"
-      ON user_roles (user_id, role_id, COALESCE(organization_id, '00000000-0000-0000-0000-000000000000'));
+      ON user_roles (user_id, role_id, organization_id)
+      WHERE organization_id IS NOT NULL;
+    `);
+
+    // Index for system/global role assignments (organization_id IS NULL)
+    await queryRunner.query(`
+      CREATE UNIQUE INDEX "UQ_user_roles_user_role_global"
+      ON user_roles (user_id, role_id)
+      WHERE organization_id IS NULL;
     `);
 
     // ========================================
@@ -175,6 +184,7 @@ export class AddOrganizationScopeToRBACTables1768105400000
     // ========================================
 
     // Update user_has_role function to support organization context
+    // Simplified logic: system roles apply globally, org roles require org match
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION public.user_has_role(
         p_user_id UUID,
@@ -183,28 +193,44 @@ export class AddOrganizationScopeToRBACTables1768105400000
       )
       RETURNS BOOLEAN AS $$
       BEGIN
+        -- Case 1: Check for system role (applies globally)
+        IF EXISTS (
+          SELECT 1
+          FROM user_roles ur
+          JOIN roles r ON r.id = ur.role_id
+          WHERE ur.user_id = p_user_id
+            AND r.name = p_role_name
+            AND r.is_system_role = true
+        ) THEN
+          RETURN true;
+        END IF;
+
+        -- Case 2: No org specified - check any role match
+        IF p_organization_id IS NULL THEN
+          RETURN EXISTS (
+            SELECT 1
+            FROM user_roles ur
+            JOIN roles r ON r.id = ur.role_id
+            WHERE ur.user_id = p_user_id
+              AND r.name = p_role_name
+          );
+        END IF;
+
+        -- Case 3: Org specified - check org-scoped role
         RETURN EXISTS (
           SELECT 1
           FROM user_roles ur
           JOIN roles r ON r.id = ur.role_id
           WHERE ur.user_id = p_user_id
             AND r.name = p_role_name
-            AND (
-              -- System roles (no organization) apply globally
-              r.organization_id IS NULL
-              -- Or match specific organization
-              OR r.organization_id = p_organization_id
-              -- Or user has role in the specified organization context
-              OR ur.organization_id = p_organization_id
-              -- If no org specified, match any
-              OR p_organization_id IS NULL
-            )
+            AND ur.organization_id = p_organization_id
         );
       END;
       $$ LANGUAGE plpgsql SECURITY DEFINER;
     `);
 
     // Update user_has_permission function to support organization context
+    // Simplified logic: system roles apply globally, org roles require org match
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION public.user_has_permission(
         p_user_id UUID,
@@ -213,7 +239,8 @@ export class AddOrganizationScopeToRBACTables1768105400000
       )
       RETURNS BOOLEAN AS $$
       BEGIN
-        RETURN EXISTS (
+        -- Case 1: Check permissions from system roles (apply globally)
+        IF EXISTS (
           SELECT 1
           FROM user_roles ur
           JOIN roles r ON r.id = ur.role_id
@@ -221,21 +248,39 @@ export class AddOrganizationScopeToRBACTables1768105400000
           JOIN permissions p ON p.id = rp.permission_id
           WHERE ur.user_id = p_user_id
             AND p.name = p_permission_name
-            AND (
-              -- System roles apply globally
-              r.organization_id IS NULL
-              -- Or match specific organization
-              OR r.organization_id = p_organization_id
-              OR ur.organization_id = p_organization_id
-              -- If no org specified, match any
-              OR p_organization_id IS NULL
-            )
+            AND r.is_system_role = true
+        ) THEN
+          RETURN true;
+        END IF;
+
+        -- Case 2: No org specified - check any permission match
+        IF p_organization_id IS NULL THEN
+          RETURN EXISTS (
+            SELECT 1
+            FROM user_roles ur
+            JOIN role_permissions rp ON rp.role_id = ur.role_id
+            JOIN permissions p ON p.id = rp.permission_id
+            WHERE ur.user_id = p_user_id
+              AND p.name = p_permission_name
+          );
+        END IF;
+
+        -- Case 3: Org specified - check org-scoped permission
+        RETURN EXISTS (
+          SELECT 1
+          FROM user_roles ur
+          JOIN role_permissions rp ON rp.role_id = ur.role_id
+          JOIN permissions p ON p.id = rp.permission_id
+          WHERE ur.user_id = p_user_id
+            AND p.name = p_permission_name
+            AND ur.organization_id = p_organization_id
         );
       END;
       $$ LANGUAGE plpgsql SECURITY DEFINER;
     `);
 
     // Create new helper function to check hierarchy level
+    // Returns the minimum (most privileged) hierarchy level for a user
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION public.user_role_hierarchy_level(
         p_user_id UUID,
@@ -245,16 +290,22 @@ export class AddOrganizationScopeToRBACTables1768105400000
       DECLARE
         min_level INTEGER;
       BEGIN
+        -- Get minimum hierarchy from system roles (global)
         SELECT MIN(r.hierarchy_level) INTO min_level
         FROM user_roles ur
         JOIN roles r ON r.id = ur.role_id
         WHERE ur.user_id = p_user_id
-          AND (
-            r.organization_id IS NULL
-            OR r.organization_id = p_organization_id
-            OR ur.organization_id = p_organization_id
-            OR p_organization_id IS NULL
-          );
+          AND r.is_system_role = true;
+
+        -- If org specified, also check org-scoped roles
+        IF p_organization_id IS NOT NULL THEN
+          SELECT LEAST(COALESCE(min_level, 999), COALESCE(MIN(r.hierarchy_level), 999))
+          INTO min_level
+          FROM user_roles ur
+          JOIN roles r ON r.id = ur.role_id
+          WHERE ur.user_id = p_user_id
+            AND ur.organization_id = p_organization_id;
+        END IF;
 
         RETURN COALESCE(min_level, 999);
       END;
@@ -297,6 +348,7 @@ export class AddOrganizationScopeToRBACTables1768105400000
     );
 
     // Create new SELECT policy - users can see system roles and roles from their organizations
+    // Note: System roles have is_system_role=true (organization_id IS NULL is implied)
     await queryRunner.query(`
       CREATE POLICY roles_select_policy ON roles
         FOR SELECT
@@ -305,8 +357,7 @@ export class AddOrganizationScopeToRBACTables1768105400000
           AND (
             -- System roles visible to all authenticated users
             is_system_role = true
-            OR organization_id IS NULL
-            -- Or user belongs to the organization
+            -- Or user belongs to the organization that owns the role
             OR EXISTS (
               SELECT 1
               FROM users u
@@ -314,7 +365,7 @@ export class AddOrganizationScopeToRBACTables1768105400000
               WHERE u.supabase_user_id = auth.uid()
                 AND ur.organization_id = roles.organization_id
             )
-            -- Or user is super_admin
+            -- Or user is super_admin (can see all)
             OR EXISTS (
               SELECT 1
               FROM users u
@@ -695,10 +746,15 @@ export class AddOrganizationScopeToRBACTables1768105400000
     // ROLLBACK: RESTORE ORIGINAL UNIQUE CONSTRAINT
     // ========================================
 
+    // Drop both partial unique indexes
     await queryRunner.query(
       `DROP INDEX IF EXISTS "UQ_user_roles_user_role_org";`,
     );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "UQ_user_roles_user_role_global";`,
+    );
 
+    // Restore original unique index
     await queryRunner.query(`
       CREATE UNIQUE INDEX "IDX_user_roles_user_role"
       ON user_roles (user_id, role_id);
