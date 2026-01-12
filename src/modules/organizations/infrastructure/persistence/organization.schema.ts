@@ -30,7 +30,7 @@ export class OrganizationSchema {
   @Column({ length: 100, unique: true })
   slug: string;
 
-  @Column({ length: 50 })
+  @Column({ type: 'varchar', length: 50 })
   type: OrganizationType;
 
   @Column({
