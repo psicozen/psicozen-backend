@@ -1,10 +1,10 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
-import { TestOrganizationSchema } from './test-organization.schema';
+import { OrganizationSchema } from '../../src/modules/organizations/infrastructure/persistence/organization.schema';
 
 export const testDataSourceOptions: DataSourceOptions = {
   type: 'better-sqlite3',
   database: ':memory:',
-  entities: [TestOrganizationSchema],
+  entities: [OrganizationSchema],
   synchronize: true,
   dropSchema: true,
   logging: false,

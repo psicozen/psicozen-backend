@@ -1,4 +1,4 @@
-import { TestOrganizationSchema } from '../config/test-organization.schema';
+import { OrganizationSchema } from '../../src/modules/organizations/infrastructure/persistence/organization.schema';
 import {
   OrganizationType,
   DEFAULT_ORGANIZATION_SETTINGS,
@@ -26,7 +26,7 @@ export interface CreateOrganizationFixtureOptions {
 
 export function createOrganizationFixture(
   options: CreateOrganizationFixtureOptions = {},
-): Partial<TestOrganizationSchema> {
+): Partial<OrganizationSchema> {
   const id = options.id ?? generateTestId();
   const name = options.name ?? `Test Organization ${fixtureCounter}`;
   const slug = options.slug ?? name.toLowerCase().replace(/\s+/g, '-');
@@ -47,28 +47,28 @@ export function createOrganizationFixture(
 
 export function createCompanyFixture(
   options: Omit<CreateOrganizationFixtureOptions, 'type'> = {},
-): Partial<TestOrganizationSchema> {
+): Partial<OrganizationSchema> {
   return createOrganizationFixture({ ...options, type: 'company' });
 }
 
 export function createDepartmentFixture(
   options: Omit<CreateOrganizationFixtureOptions, 'type'> = {},
-): Partial<TestOrganizationSchema> {
+): Partial<OrganizationSchema> {
   return createOrganizationFixture({ ...options, type: 'department' });
 }
 
 export function createTeamFixture(
   options: Omit<CreateOrganizationFixtureOptions, 'type'> = {},
-): Partial<TestOrganizationSchema> {
+): Partial<OrganizationSchema> {
   return createOrganizationFixture({ ...options, type: 'team' });
 }
 
 export function createOrganizationHierarchy(): {
-  company: Partial<TestOrganizationSchema>;
-  department1: Partial<TestOrganizationSchema>;
-  department2: Partial<TestOrganizationSchema>;
-  team1: Partial<TestOrganizationSchema>;
-  team2: Partial<TestOrganizationSchema>;
+  company: Partial<OrganizationSchema>;
+  department1: Partial<OrganizationSchema>;
+  department2: Partial<OrganizationSchema>;
+  team1: Partial<OrganizationSchema>;
+  team2: Partial<OrganizationSchema>;
 } {
   const company = createCompanyFixture({ name: 'Acme Corp', slug: 'acme-corp' });
   const department1 = createDepartmentFixture({

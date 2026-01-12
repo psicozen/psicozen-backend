@@ -1,6 +1,6 @@
 import { Repository } from 'typeorm';
-import { TestOrganizationRepository } from '../config/test-organization.repository';
-import { TestOrganizationSchema } from '../config/test-organization.schema';
+import { OrganizationRepository } from '../../src/modules/organizations/infrastructure/repositories/organization.repository';
+import { OrganizationSchema } from '../../src/modules/organizations/infrastructure/persistence/organization.schema';
 import { OrganizationEntity } from '../../src/modules/organizations/domain/entities/organization.entity';
 import {
   initializeTestDatabase,
@@ -16,14 +16,14 @@ import {
 } from '../fixtures/organization.fixtures';
 
 describe('OrganizationRepository Integration Tests', () => {
-  let repository: TestOrganizationRepository;
-  let typeormRepository: Repository<TestOrganizationSchema>;
+  let repository: OrganizationRepository;
+  let typeormRepository: Repository<OrganizationSchema>;
 
   beforeAll(async () => {
     await initializeTestDatabase();
     const dataSource = getTestDataSource();
-    typeormRepository = dataSource.getRepository(TestOrganizationSchema);
-    repository = new TestOrganizationRepository(typeormRepository);
+    typeormRepository = dataSource.getRepository(OrganizationSchema);
+    repository = new OrganizationRepository(typeormRepository);
   });
 
   afterEach(async () => {

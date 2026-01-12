@@ -31,7 +31,7 @@ export class OrganizationSchema {
   @Column({ length: 50 })
   type: OrganizationType;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'simple-json', default: '{}' })
   settings: OrganizationSettings;
 
   @Column({ name: 'parent_id', nullable: true })
