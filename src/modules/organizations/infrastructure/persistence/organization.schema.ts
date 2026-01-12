@@ -9,7 +9,10 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import type { OrganizationSettings } from '../../domain/types/organization-settings.types';
+import type {
+  OrganizationSettings,
+  OrganizationType,
+} from '../../domain/types/organization-settings.types';
 
 @Entity('organizations')
 @Index(['slug'], { unique: true })
@@ -19,14 +22,14 @@ export class OrganizationSchema {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({ length: 100 })
   name: string;
 
-  @Column({ unique: true })
+  @Column({ length: 100, unique: true })
   slug: string;
 
-  @Column({ type: 'varchar' })
-  type: string;
+  @Column({ length: 50 })
+  type: OrganizationType;
 
   @Column({ type: 'jsonb', default: {} })
   settings: OrganizationSettings;

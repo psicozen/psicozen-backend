@@ -5,8 +5,10 @@
       "Bash(npm run lint:*)",
       "Bash(npx eslint:*)",
       "Bash(npm run build:*)",
-      "Bash(ls -la \"C:\\\\Users\\\\rikdi\\\\OneDrive\\\\Documentos\\\\GitHub\\\\psicozen-backend\\\\src\\\\modules\"\" | grep -E \"^d \")",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "Bash(git merge:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

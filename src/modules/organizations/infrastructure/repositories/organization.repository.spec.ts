@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { OrganizationRepository } from './organization.repository';
 import { OrganizationSchema } from '../persistence/organization.schema';
 import { OrganizationEntity } from '../../domain/entities/organization.entity';
@@ -92,7 +92,7 @@ describe('OrganizationRepository', () => {
       expect(result).toBeInstanceOf(OrganizationEntity);
       expect(result?.slug).toBe('test-organization');
       expect(typeOrmRepository.findOne).toHaveBeenCalledWith({
-        where: { slug: 'test-organization' },
+        where: { slug: 'test-organization', deletedAt: IsNull() },
       });
     });
 
@@ -118,7 +118,7 @@ describe('OrganizationRepository', () => {
       expect(result[0]).toBeInstanceOf(OrganizationEntity);
       expect(result[1]).toBeInstanceOf(OrganizationEntity);
       expect(typeOrmRepository.find).toHaveBeenCalledWith({
-        where: { parentId: 'parent-123' },
+        where: { parentId: 'parent-123', deletedAt: IsNull() },
       });
     });
 
@@ -146,7 +146,7 @@ describe('OrganizationRepository', () => {
       expect(result).toHaveLength(2);
       expect(result[0]).toBeInstanceOf(OrganizationEntity);
       expect(typeOrmRepository.find).toHaveBeenCalledWith({
-        where: { type: 'company', isActive: true },
+        where: { type: 'company', isActive: true, deletedAt: IsNull() },
       });
     });
 

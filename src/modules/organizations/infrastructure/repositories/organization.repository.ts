@@ -1,15 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { TypeOrmBaseRepository } from '../../../../core/infrastructure/repositories/typeorm-base.repository';
 import { OrganizationEntity } from '../../domain/entities/organization.entity';
 import { OrganizationSchema } from '../persistence/organization.schema';
 import { IOrganizationRepository } from '../../domain/repositories/organization.repository.interface';
-import type {
+import {
   OrganizationType,
-  OrganizationSettings,
+  DEFAULT_ORGANIZATION_SETTINGS,
 } from '../../domain/types/organization-settings.types';
-import { DEFAULT_ORGANIZATION_SETTINGS } from '../../domain/types/organization-settings.types';
 
 @Injectable()
 export class OrganizationRepository
@@ -28,8 +27,8 @@ export class OrganizationRepository
       id: schema.id,
       name: schema.name,
       slug: schema.slug,
-      type: schema.type as OrganizationType,
-      settings: this.mergeSettings(schema.settings),
+      type: schema.type,
+      settings: { ...DEFAULT_ORGANIZATION_SETTINGS, ...schema.settings },
       parentId: schema.parentId,
       isActive: schema.isActive,
       createdAt: schema.createdAt,
@@ -47,19 +46,20 @@ export class OrganizationRepository
     if (domain.settings) schema.settings = domain.settings;
     if (domain.parentId !== undefined) schema.parentId = domain.parentId;
     if (domain.isActive !== undefined) schema.isActive = domain.isActive;
+    if (domain.updatedAt) schema.updatedAt = domain.updatedAt;
     return schema;
   }
 
   async findBySlug(slug: string): Promise<OrganizationEntity | null> {
     const schema = await this.repository.findOne({
-      where: { slug },
+      where: { slug, deletedAt: IsNull() },
     });
     return schema ? this.toDomain(schema) : null;
   }
 
   async findChildren(parentId: string): Promise<OrganizationEntity[]> {
     const schemas = await this.repository.find({
-      where: { parentId },
+      where: { parentId, deletedAt: IsNull() },
     });
     return schemas.map((schema) => this.toDomain(schema));
   }
@@ -68,20 +68,12 @@ export class OrganizationRepository
     type: OrganizationType,
   ): Promise<OrganizationEntity[]> {
     const schemas = await this.repository.find({
-      where: { type, isActive: true },
+      where: {
+        type,
+        isActive: true,
+        deletedAt: IsNull(),
+      },
     });
     return schemas.map((schema) => this.toDomain(schema));
-  }
-
-  /**
-   * Merge saved settings with defaults to ensure all properties exist
-   */
-  private mergeSettings(
-    savedSettings: Partial<OrganizationSettings>,
-  ): OrganizationSettings {
-    return {
-      ...DEFAULT_ORGANIZATION_SETTINGS,
-      ...savedSettings,
-    };
   }
 }
