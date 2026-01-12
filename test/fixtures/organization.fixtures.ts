@@ -70,7 +70,10 @@ export function createOrganizationHierarchy(): {
   team1: Partial<OrganizationSchema>;
   team2: Partial<OrganizationSchema>;
 } {
-  const company = createCompanyFixture({ name: 'Acme Corp', slug: 'acme-corp' });
+  const company = createCompanyFixture({
+    name: 'Acme Corp',
+    slug: 'acme-corp',
+  });
   const department1 = createDepartmentFixture({
     name: 'Engineering',
     slug: 'engineering',
