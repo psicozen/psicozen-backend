@@ -1,14 +1,26 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { IsNull } from 'typeorm';
 import { OrganizationRepository } from './organization.repository';
 import { OrganizationSchema } from '../persistence/organization.schema';
 import { OrganizationEntity } from '../../domain/entities/organization.entity';
-import { DEFAULT_ORGANIZATION_SETTINGS } from '../../domain/types/organization-settings.types';
+import {
+  DEFAULT_ORGANIZATION_SETTINGS,
+  OrganizationSettings,
+} from '../../domain/types/organization-settings.types';
 
 describe('OrganizationRepository', () => {
   let repository: OrganizationRepository;
-  let typeOrmRepository: jest.Mocked<Repository<OrganizationSchema>>;
+
+  // Mock functions - avoid unbound-method ESLint errors
+  const mockFindOne = jest.fn();
+  const mockFind = jest.fn();
+  const mockSave = jest.fn();
+  const mockUpdate = jest.fn();
+  const mockDelete = jest.fn();
+  const mockSoftDelete = jest.fn();
+  const mockFindAndCount = jest.fn();
+  const mockCount = jest.fn();
 
   const mockSchema: OrganizationSchema = {
     id: 'org-123',
@@ -31,15 +43,17 @@ describe('OrganizationRepository', () => {
   } as OrganizationSchema;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+
     const mockTypeOrmRepository = {
-      findOne: jest.fn(),
-      find: jest.fn(),
-      save: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      softDelete: jest.fn(),
-      findAndCount: jest.fn(),
-      count: jest.fn(),
+      findOne: mockFindOne,
+      find: mockFind,
+      save: mockSave,
+      update: mockUpdate,
+      delete: mockDelete,
+      softDelete: mockSoftDelete,
+      findAndCount: mockFindAndCount,
+      count: mockCount,
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -53,7 +67,6 @@ describe('OrganizationRepository', () => {
     }).compile();
 
     repository = module.get<OrganizationRepository>(OrganizationRepository);
-    typeOrmRepository = module.get(getRepositoryToken(OrganizationSchema));
   });
 
   it('should be defined', () => {
@@ -62,20 +75,20 @@ describe('OrganizationRepository', () => {
 
   describe('findById', () => {
     it('should find organization by id', async () => {
-      typeOrmRepository.findOne.mockResolvedValue(mockSchema);
+      mockFindOne.mockResolvedValue(mockSchema);
 
       const result = await repository.findById('org-123');
 
       expect(result).toBeInstanceOf(OrganizationEntity);
       expect(result?.id).toBe('org-123');
       expect(result?.name).toBe('Test Organization');
-      expect(typeOrmRepository.findOne).toHaveBeenCalledWith({
+      expect(mockFindOne).toHaveBeenCalledWith({
         where: { id: 'org-123' },
       });
     });
 
     it('should return null when organization not found', async () => {
-      typeOrmRepository.findOne.mockResolvedValue(null);
+      mockFindOne.mockResolvedValue(null);
 
       const result = await repository.findById('non-existent');
 
@@ -85,19 +98,19 @@ describe('OrganizationRepository', () => {
 
   describe('findBySlug', () => {
     it('should find organization by slug', async () => {
-      typeOrmRepository.findOne.mockResolvedValue(mockSchema);
+      mockFindOne.mockResolvedValue(mockSchema);
 
       const result = await repository.findBySlug('test-organization');
 
       expect(result).toBeInstanceOf(OrganizationEntity);
       expect(result?.slug).toBe('test-organization');
-      expect(typeOrmRepository.findOne).toHaveBeenCalledWith({
+      expect(mockFindOne).toHaveBeenCalledWith({
         where: { slug: 'test-organization', deletedAt: IsNull() },
       });
     });
 
     it('should return null when organization not found by slug', async () => {
-      typeOrmRepository.findOne.mockResolvedValue(null);
+      mockFindOne.mockResolvedValue(null);
 
       const result = await repository.findBySlug('non-existent-slug');
 
@@ -110,20 +123,21 @@ describe('OrganizationRepository', () => {
       const childSchema1 = { ...mockSchema, id: 'child-1', name: 'Child 1' };
       const childSchema2 = { ...mockSchema, id: 'child-2', name: 'Child 2' };
 
-      typeOrmRepository.find.mockResolvedValue([childSchema1, childSchema2]);
+      mockFind.mockResolvedValue([childSchema1, childSchema2]);
 
       const result = await repository.findChildren('parent-123');
 
       expect(result).toHaveLength(2);
       expect(result[0]).toBeInstanceOf(OrganizationEntity);
       expect(result[1]).toBeInstanceOf(OrganizationEntity);
-      expect(typeOrmRepository.find).toHaveBeenCalledWith({
+      expect(mockFind).toHaveBeenCalledWith({
         where: { parentId: 'parent-123', deletedAt: IsNull() },
+        order: { createdAt: 'ASC' },
       });
     });
 
     it('should return empty array when no children found', async () => {
-      typeOrmRepository.find.mockResolvedValue([]);
+      mockFind.mockResolvedValue([]);
 
       const result = await repository.findChildren('parent-without-children');
 
@@ -136,22 +150,20 @@ describe('OrganizationRepository', () => {
       const companySchema1 = { ...mockSchema, id: 'company-1' };
       const companySchema2 = { ...mockSchema, id: 'company-2' };
 
-      typeOrmRepository.find.mockResolvedValue([
-        companySchema1,
-        companySchema2,
-      ]);
+      mockFind.mockResolvedValue([companySchema1, companySchema2]);
 
       const result = await repository.findActiveByType('company');
 
       expect(result).toHaveLength(2);
       expect(result[0]).toBeInstanceOf(OrganizationEntity);
-      expect(typeOrmRepository.find).toHaveBeenCalledWith({
+      expect(mockFind).toHaveBeenCalledWith({
         where: { type: 'company', isActive: true, deletedAt: IsNull() },
+        order: { name: 'ASC' },
       });
     });
 
     it('should return empty array when no active organizations of type found', async () => {
-      typeOrmRepository.find.mockResolvedValue([]);
+      mockFind.mockResolvedValue([]);
 
       const result = await repository.findActiveByType('team');
 
@@ -175,7 +187,9 @@ describe('OrganizationRepository', () => {
     it('should merge settings with defaults when partial settings are provided', () => {
       const schemaWithPartialSettings = {
         ...mockSchema,
-        settings: { timezone: 'UTC' } as any,
+        settings: {
+          timezone: 'UTC',
+        } as Partial<OrganizationSettings> as OrganizationSettings,
       };
 
       const entity = repository.toDomain(schemaWithPartialSettings);
@@ -226,7 +240,7 @@ describe('OrganizationRepository', () => {
         type: 'company',
       });
 
-      typeOrmRepository.save.mockResolvedValue({
+      mockSave.mockResolvedValue({
         ...mockSchema,
         id: 'new-org-id',
         name: 'New Organization',
@@ -237,7 +251,7 @@ describe('OrganizationRepository', () => {
 
       expect(result).toBeInstanceOf(OrganizationEntity);
       expect(result.name).toBe('New Organization');
-      expect(typeOrmRepository.save).toHaveBeenCalled();
+      expect(mockSave).toHaveBeenCalled();
     });
   });
 });
