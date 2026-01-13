@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TypeOrmBaseRepository } from '../../../../core/infrastructure/repositories/typeorm-base.repository';
-import { Role } from '../../../roles/domain/enums/role.enum';
 import { UserEntity } from '../../domain/entities/user.entity';
 import { UserSchema } from '../persistence/user.schema';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
@@ -73,46 +72,5 @@ export class UserRepository
       where: { email },
     });
     return count > 0;
-  }
-
-  async getRolesByOrganization(
-    userId: string,
-    organizationId?: string,
-  ): Promise<Role[]> {
-    const queryBuilder = this.repository.manager
-      .createQueryBuilder()
-      .select('DISTINCT r.name', 'name')
-      .from('user_roles', 'ur')
-      .innerJoin('roles', 'r', 'ur.role_id = r.id')
-      .where('ur.user_id = :userId', { userId });
-
-    if (organizationId) {
-      // Return roles for the organization + global roles (organization_id IS NULL)
-      queryBuilder.andWhere(
-        '(ur.organization_id = :organizationId OR ur.organization_id IS NULL)',
-        { organizationId },
-      );
-    } else {
-      // No organization: only global roles (e.g., SUPER_ADMIN)
-      queryBuilder.andWhere('ur.organization_id IS NULL');
-    }
-
-    const results = await queryBuilder.getRawMany<{ name: string }>();
-    return results.map((r) => r.name as Role);
-  }
-
-  async findByRoles(
-    organizationId: string,
-    roles: Role[],
-  ): Promise<UserEntity[]> {
-    const schemas = await this.repository
-      .createQueryBuilder('users')
-      .innerJoin('user_roles', 'ur', 'ur.user_id = users.id')
-      .innerJoin('roles', 'r', 'r.id = ur.role_id')
-      .where('ur.organization_id = :organizationId', { organizationId })
-      .andWhere('r.name IN (:...roles)', { roles })
-      .getMany();
-
-    return schemas.map((schema) => this.toDomain(schema));
   }
 }
