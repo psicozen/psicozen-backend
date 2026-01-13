@@ -12,6 +12,7 @@ import { getDatabaseConfig } from './config/database.config';
 import { SupabaseModule } from './core/infrastructure/supabase/supabase.module';
 import { AllExceptionsFilter } from './core/presentation/filters/http-exception.filter';
 import { JwtAuthGuard } from './modules/auth/presentation/guards/jwt-auth.guard';
+import { RolesGuard } from './core/presentation/guards/roles.guard';
 
 // Feature Modules
 import { AuthModule } from './modules/auth/auth.module';
@@ -76,6 +77,8 @@ import { AppService } from './app.service';
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
+    // RolesGuard for @UseGuards(RolesGuard) - uses organization context
+    RolesGuard,
   ],
 })
 export class AppModule implements NestModule {
