@@ -126,7 +126,7 @@ describe('RolesGuard', () => {
       });
 
       it('should allow SUPER_ADMIN access to any route requiring any role', async () => {
-        reflector.getAllAndOverride.mockReturnValue([Role.OWNER]);
+        reflector.getAllAndOverride.mockReturnValue([Role.ADMIN]);
         createMockContext(
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
@@ -170,12 +170,14 @@ describe('RolesGuard', () => {
       });
 
       it('should pass organization ID to repository', async () => {
-        reflector.getAllAndOverride.mockReturnValue([Role.MEMBER]);
+        reflector.getAllAndOverride.mockReturnValue([Role.COLABORADOR]);
         createMockContext(
           { id: 'user-456' },
           { 'x-organization-id': 'org-789' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([Role.MEMBER]);
+        userRepository.getRolesByOrganization.mockResolvedValue([
+          Role.COLABORADOR,
+        ]);
 
         await guard.canActivate(mockExecutionContext);
 
@@ -187,8 +189,8 @@ describe('RolesGuard', () => {
     });
 
     describe('role hierarchy', () => {
-      it('should allow access when user has higher role than required', async () => {
-        reflector.getAllAndOverride.mockReturnValue([Role.MEMBER]);
+      it('should allow access when user has higher role (lower hierarchy number)', async () => {
+        reflector.getAllAndOverride.mockReturnValue([Role.COLABORADOR]);
         createMockContext(
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
@@ -201,51 +203,57 @@ describe('RolesGuard', () => {
       });
 
       it('should allow access when user has equal role to required', async () => {
-        reflector.getAllAndOverride.mockReturnValue([Role.MANAGER]);
+        reflector.getAllAndOverride.mockReturnValue([Role.GESTOR]);
         createMockContext(
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([Role.MANAGER]);
+        userRepository.getRolesByOrganization.mockResolvedValue([Role.GESTOR]);
 
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
       });
 
-      it('should deny access when user has lower role than required', async () => {
+      it('should deny access when user has lower role (higher hierarchy number)', async () => {
         reflector.getAllAndOverride.mockReturnValue([Role.ADMIN]);
         createMockContext(
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([Role.MEMBER]);
+        userRepository.getRolesByOrganization.mockResolvedValue([
+          Role.COLABORADOR,
+        ]);
 
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(false);
       });
 
-      it('should allow OWNER to access ADMIN routes', async () => {
+      it('should allow SUPER_ADMIN to access ADMIN routes', async () => {
         reflector.getAllAndOverride.mockReturnValue([Role.ADMIN]);
         createMockContext(
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([Role.OWNER]);
+        userRepository.getRolesByOrganization.mockResolvedValue([
+          Role.SUPER_ADMIN,
+        ]);
 
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
       });
 
-      it('should deny VIEWER access to THERAPIST routes', async () => {
-        reflector.getAllAndOverride.mockReturnValue([Role.THERAPIST]);
+      it('should deny COLABORADOR access to GESTOR routes', async () => {
+        reflector.getAllAndOverride.mockReturnValue([Role.GESTOR]);
         createMockContext(
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([Role.VIEWER]);
+        userRepository.getRolesByOrganization.mockResolvedValue([
+          Role.COLABORADOR,
+        ]);
 
         const result = await guard.canActivate(mockExecutionContext);
 
@@ -255,17 +263,12 @@ describe('RolesGuard', () => {
 
     describe('multiple required roles', () => {
       it('should allow access if user has any one of multiple required roles', async () => {
-        reflector.getAllAndOverride.mockReturnValue([
-          Role.ADMIN,
-          Role.THERAPIST,
-        ]);
+        reflector.getAllAndOverride.mockReturnValue([Role.ADMIN, Role.GESTOR]);
         createMockContext(
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([
-          Role.THERAPIST,
-        ]);
+        userRepository.getRolesByOrganization.mockResolvedValue([Role.GESTOR]);
 
         const result = await guard.canActivate(mockExecutionContext);
 
@@ -274,8 +277,8 @@ describe('RolesGuard', () => {
 
       it('should allow access if user has higher role than any required', async () => {
         reflector.getAllAndOverride.mockReturnValue([
-          Role.MANAGER,
-          Role.THERAPIST,
+          Role.GESTOR,
+          Role.COLABORADOR,
         ]);
         createMockContext(
           { id: 'user-123' },
@@ -289,12 +292,14 @@ describe('RolesGuard', () => {
       });
 
       it('should deny access if user has lower role than all required', async () => {
-        reflector.getAllAndOverride.mockReturnValue([Role.ADMIN, Role.MANAGER]);
+        reflector.getAllAndOverride.mockReturnValue([Role.ADMIN, Role.GESTOR]);
         createMockContext(
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([Role.MEMBER]);
+        userRepository.getRolesByOrganization.mockResolvedValue([
+          Role.COLABORADOR,
+        ]);
 
         const result = await guard.canActivate(mockExecutionContext);
 
@@ -310,8 +315,8 @@ describe('RolesGuard', () => {
           { 'x-organization-id': 'org-123' },
         );
         userRepository.getRolesByOrganization.mockResolvedValue([
-          Role.MEMBER,
-          Role.THERAPIST,
+          Role.COLABORADOR,
+          Role.GESTOR,
           Role.ADMIN,
         ]);
 
@@ -320,15 +325,15 @@ describe('RolesGuard', () => {
         expect(result).toBe(true);
       });
 
-      it('should use highest user role for hierarchy check', async () => {
-        reflector.getAllAndOverride.mockReturnValue([Role.MANAGER]);
+      it('should use highest user role (lowest hierarchy number) for access', async () => {
+        reflector.getAllAndOverride.mockReturnValue([Role.GESTOR]);
         createMockContext(
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
         userRepository.getRolesByOrganization.mockResolvedValue([
-          Role.VIEWER,
-          Role.ADMIN, // This should grant access
+          Role.COLABORADOR,
+          Role.ADMIN, // This should grant access (hierarchy 100 < 200)
         ]);
 
         const result = await guard.canActivate(mockExecutionContext);
@@ -339,7 +344,7 @@ describe('RolesGuard', () => {
 
     describe('edge cases', () => {
       it('should handle empty user roles array', async () => {
-        reflector.getAllAndOverride.mockReturnValue([Role.MEMBER]);
+        reflector.getAllAndOverride.mockReturnValue([Role.COLABORADOR]);
         createMockContext(
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
@@ -352,7 +357,7 @@ describe('RolesGuard', () => {
       });
 
       it('should handle user not in organization', async () => {
-        reflector.getAllAndOverride.mockReturnValue([Role.MEMBER]);
+        reflector.getAllAndOverride.mockReturnValue([Role.COLABORADOR]);
         createMockContext(
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },

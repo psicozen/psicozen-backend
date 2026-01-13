@@ -2,7 +2,7 @@ import {
   Role,
   ROLE_HIERARCHY,
   hasHigherRole,
-  getRolesAbove,
+  getSubordinateRoles,
   isGlobalRole,
 } from './role.enum';
 
@@ -12,33 +12,21 @@ describe('Role Enum', () => {
       expect(Role.SUPER_ADMIN).toBe('super_admin');
     });
 
-    it('should have OWNER role', () => {
-      expect(Role.OWNER).toBe('owner');
-    });
-
     it('should have ADMIN role', () => {
       expect(Role.ADMIN).toBe('admin');
     });
 
-    it('should have MANAGER role', () => {
-      expect(Role.MANAGER).toBe('manager');
+    it('should have GESTOR role', () => {
+      expect(Role.GESTOR).toBe('gestor');
     });
 
-    it('should have THERAPIST role', () => {
-      expect(Role.THERAPIST).toBe('therapist');
+    it('should have COLABORADOR role', () => {
+      expect(Role.COLABORADOR).toBe('colaborador');
     });
 
-    it('should have MEMBER role', () => {
-      expect(Role.MEMBER).toBe('member');
-    });
-
-    it('should have VIEWER role', () => {
-      expect(Role.VIEWER).toBe('viewer');
-    });
-
-    it('should have exactly 7 roles', () => {
+    it('should have exactly 4 roles', () => {
       const roles = Object.values(Role);
-      expect(roles).toHaveLength(7);
+      expect(roles).toHaveLength(4);
     });
 
     it('should only contain string values', () => {
@@ -64,89 +52,121 @@ describe('Role Enum', () => {
       });
     });
 
-    it('should have SUPER_ADMIN as highest level', () => {
-      const maxLevel = Math.max(...Object.values(ROLE_HIERARCHY));
-      expect(ROLE_HIERARCHY[Role.SUPER_ADMIN]).toBe(maxLevel);
-    });
-
-    it('should have VIEWER as lowest level', () => {
+    it('should have SUPER_ADMIN as lowest hierarchy level (highest privilege)', () => {
       const minLevel = Math.min(...Object.values(ROLE_HIERARCHY));
-      expect(ROLE_HIERARCHY[Role.VIEWER]).toBe(minLevel);
+      expect(ROLE_HIERARCHY[Role.SUPER_ADMIN]).toBe(minLevel);
+      expect(ROLE_HIERARCHY[Role.SUPER_ADMIN]).toBe(0);
     });
 
-    it('should have correct hierarchy order', () => {
-      expect(ROLE_HIERARCHY[Role.SUPER_ADMIN]).toBeGreaterThan(
-        ROLE_HIERARCHY[Role.OWNER],
-      );
-      expect(ROLE_HIERARCHY[Role.OWNER]).toBeGreaterThan(
+    it('should have COLABORADOR as highest hierarchy level (lowest privilege)', () => {
+      const maxLevel = Math.max(...Object.values(ROLE_HIERARCHY));
+      expect(ROLE_HIERARCHY[Role.COLABORADOR]).toBe(maxLevel);
+      expect(ROLE_HIERARCHY[Role.COLABORADOR]).toBe(300);
+    });
+
+    it('should have correct hierarchy order (lower number = higher privilege)', () => {
+      expect(ROLE_HIERARCHY[Role.SUPER_ADMIN]).toBeLessThan(
         ROLE_HIERARCHY[Role.ADMIN],
       );
-      expect(ROLE_HIERARCHY[Role.ADMIN]).toBeGreaterThan(
-        ROLE_HIERARCHY[Role.MANAGER],
+      expect(ROLE_HIERARCHY[Role.ADMIN]).toBeLessThan(
+        ROLE_HIERARCHY[Role.GESTOR],
       );
-      expect(ROLE_HIERARCHY[Role.MANAGER]).toBeGreaterThan(
-        ROLE_HIERARCHY[Role.THERAPIST],
+      expect(ROLE_HIERARCHY[Role.GESTOR]).toBeLessThan(
+        ROLE_HIERARCHY[Role.COLABORADOR],
       );
-      expect(ROLE_HIERARCHY[Role.THERAPIST]).toBeGreaterThan(
-        ROLE_HIERARCHY[Role.MEMBER],
-      );
-      expect(ROLE_HIERARCHY[Role.MEMBER]).toBeGreaterThan(
-        ROLE_HIERARCHY[Role.VIEWER],
-      );
+    });
+
+    it('should have correct numeric values', () => {
+      expect(ROLE_HIERARCHY[Role.SUPER_ADMIN]).toBe(0);
+      expect(ROLE_HIERARCHY[Role.ADMIN]).toBe(100);
+      expect(ROLE_HIERARCHY[Role.GESTOR]).toBe(200);
+      expect(ROLE_HIERARCHY[Role.COLABORADOR]).toBe(300);
     });
   });
 
   describe('hasHigherRole', () => {
-    it('should return true when user role is higher than required', () => {
-      expect(hasHigherRole(Role.ADMIN, Role.MEMBER)).toBe(true);
-      expect(hasHigherRole(Role.SUPER_ADMIN, Role.ADMIN)).toBe(true);
-      expect(hasHigherRole(Role.OWNER, Role.THERAPIST)).toBe(true);
+    it('should return true when user role has higher privilege (lower number)', () => {
+      expect(hasHigherRole(Role.ADMIN, Role.COLABORADOR)).toBe(true); // 100 <= 300
+      expect(hasHigherRole(Role.SUPER_ADMIN, Role.ADMIN)).toBe(true); // 0 <= 100
+      expect(hasHigherRole(Role.GESTOR, Role.COLABORADOR)).toBe(true); // 200 <= 300
     });
 
     it('should return true when roles are equal', () => {
       expect(hasHigherRole(Role.ADMIN, Role.ADMIN)).toBe(true);
-      expect(hasHigherRole(Role.MEMBER, Role.MEMBER)).toBe(true);
+      expect(hasHigherRole(Role.COLABORADOR, Role.COLABORADOR)).toBe(true);
       expect(hasHigherRole(Role.SUPER_ADMIN, Role.SUPER_ADMIN)).toBe(true);
+      expect(hasHigherRole(Role.GESTOR, Role.GESTOR)).toBe(true);
     });
 
-    it('should return false when user role is lower than required', () => {
-      expect(hasHigherRole(Role.MEMBER, Role.ADMIN)).toBe(false);
-      expect(hasHigherRole(Role.VIEWER, Role.MEMBER)).toBe(false);
-      expect(hasHigherRole(Role.THERAPIST, Role.OWNER)).toBe(false);
+    it('should return false when user role has lower privilege (higher number)', () => {
+      expect(hasHigherRole(Role.COLABORADOR, Role.ADMIN)).toBe(false); // 300 > 100
+      expect(hasHigherRole(Role.COLABORADOR, Role.GESTOR)).toBe(false); // 300 > 200
+      expect(hasHigherRole(Role.GESTOR, Role.ADMIN)).toBe(false); // 200 > 100
     });
 
     it('should work correctly for adjacent roles', () => {
-      expect(hasHigherRole(Role.OWNER, Role.ADMIN)).toBe(true);
-      expect(hasHigherRole(Role.ADMIN, Role.OWNER)).toBe(false);
+      expect(hasHigherRole(Role.SUPER_ADMIN, Role.ADMIN)).toBe(true); // 0 <= 100
+      expect(hasHigherRole(Role.ADMIN, Role.SUPER_ADMIN)).toBe(false); // 100 > 0
+      expect(hasHigherRole(Role.ADMIN, Role.GESTOR)).toBe(true); // 100 <= 200
+      expect(hasHigherRole(Role.GESTOR, Role.ADMIN)).toBe(false); // 200 > 100
+    });
+
+    it('should correctly evaluate SUPER_ADMIN access to all roles', () => {
+      expect(hasHigherRole(Role.SUPER_ADMIN, Role.ADMIN)).toBe(true);
+      expect(hasHigherRole(Role.SUPER_ADMIN, Role.GESTOR)).toBe(true);
+      expect(hasHigherRole(Role.SUPER_ADMIN, Role.COLABORADOR)).toBe(true);
+    });
+
+    it('should correctly deny COLABORADOR access to higher roles', () => {
+      expect(hasHigherRole(Role.COLABORADOR, Role.SUPER_ADMIN)).toBe(false);
+      expect(hasHigherRole(Role.COLABORADOR, Role.ADMIN)).toBe(false);
+      expect(hasHigherRole(Role.COLABORADOR, Role.GESTOR)).toBe(false);
     });
   });
 
-  describe('getRolesAbove', () => {
-    it('should return all roles when given VIEWER', () => {
-      const roles = getRolesAbove(Role.VIEWER);
-      expect(roles).toHaveLength(7);
-      expect(roles).toContain(Role.SUPER_ADMIN);
-      expect(roles).toContain(Role.VIEWER);
+  describe('getSubordinateRoles', () => {
+    it('should return all roles when given SUPER_ADMIN', () => {
+      const subordinates = getSubordinateRoles(Role.SUPER_ADMIN);
+      expect(subordinates).toHaveLength(4);
+      expect(subordinates).toContain(Role.SUPER_ADMIN);
+      expect(subordinates).toContain(Role.ADMIN);
+      expect(subordinates).toContain(Role.GESTOR);
+      expect(subordinates).toContain(Role.COLABORADOR);
     });
 
-    it('should return only SUPER_ADMIN when given SUPER_ADMIN', () => {
-      const roles = getRolesAbove(Role.SUPER_ADMIN);
-      expect(roles).toHaveLength(1);
-      expect(roles).toContain(Role.SUPER_ADMIN);
+    it('should return only COLABORADOR when given COLABORADOR', () => {
+      const subordinates = getSubordinateRoles(Role.COLABORADOR);
+      expect(subordinates).toHaveLength(1);
+      expect(subordinates).toContain(Role.COLABORADOR);
+      expect(subordinates).not.toContain(Role.SUPER_ADMIN);
+      expect(subordinates).not.toContain(Role.ADMIN);
+      expect(subordinates).not.toContain(Role.GESTOR);
     });
 
-    it('should return correct roles for ADMIN', () => {
-      const roles = getRolesAbove(Role.ADMIN);
-      expect(roles).toContain(Role.SUPER_ADMIN);
-      expect(roles).toContain(Role.OWNER);
-      expect(roles).toContain(Role.ADMIN);
-      expect(roles).not.toContain(Role.MANAGER);
-      expect(roles).not.toContain(Role.MEMBER);
+    it('should return correct subordinate roles for ADMIN', () => {
+      const subordinates = getSubordinateRoles(Role.ADMIN);
+      expect(subordinates).toHaveLength(3);
+      expect(subordinates).toContain(Role.ADMIN);
+      expect(subordinates).toContain(Role.GESTOR);
+      expect(subordinates).toContain(Role.COLABORADOR);
+      expect(subordinates).not.toContain(Role.SUPER_ADMIN);
+    });
+
+    it('should return correct subordinate roles for GESTOR', () => {
+      const subordinates = getSubordinateRoles(Role.GESTOR);
+      expect(subordinates).toHaveLength(2);
+      expect(subordinates).toContain(Role.GESTOR);
+      expect(subordinates).toContain(Role.COLABORADOR);
+      expect(subordinates).not.toContain(Role.SUPER_ADMIN);
+      expect(subordinates).not.toContain(Role.ADMIN);
     });
 
     it('should include the given role itself', () => {
-      const roles = getRolesAbove(Role.THERAPIST);
-      expect(roles).toContain(Role.THERAPIST);
+      const gestorSubordinates = getSubordinateRoles(Role.GESTOR);
+      expect(gestorSubordinates).toContain(Role.GESTOR);
+
+      const adminSubordinates = getSubordinateRoles(Role.ADMIN);
+      expect(adminSubordinates).toContain(Role.ADMIN);
     });
   });
 
@@ -156,12 +176,9 @@ describe('Role Enum', () => {
     });
 
     it('should return false for organization-scoped roles', () => {
-      expect(isGlobalRole(Role.OWNER)).toBe(false);
       expect(isGlobalRole(Role.ADMIN)).toBe(false);
-      expect(isGlobalRole(Role.MANAGER)).toBe(false);
-      expect(isGlobalRole(Role.THERAPIST)).toBe(false);
-      expect(isGlobalRole(Role.MEMBER)).toBe(false);
-      expect(isGlobalRole(Role.VIEWER)).toBe(false);
+      expect(isGlobalRole(Role.GESTOR)).toBe(false);
+      expect(isGlobalRole(Role.COLABORADOR)).toBe(false);
     });
   });
 });

@@ -1,65 +1,53 @@
 /**
- * Role enum with hierarchy support for organization-scoped authorization.
- *
- * Hierarchy levels (higher = more permissions):
- * - SUPER_ADMIN (100): Global admin, bypasses organization checks
- * - OWNER (90): Organization owner, full control within org
- * - ADMIN (80): Organization admin
- * - MANAGER (60): Can manage resources and members
- * - THERAPIST (50): Healthcare professional role
- * - MEMBER (30): Regular organization member
- * - VIEWER (10): Read-only access
+ * Sistema de papéis hierárquico para PsicoZen
+ * Menor hierarchy_level = maiores privilégios
  */
 export enum Role {
+  /** Super administrador da plataforma (nível 0) */
   SUPER_ADMIN = 'super_admin',
-  OWNER = 'owner',
+
+  /** Administrador da organização (nível 100) */
   ADMIN = 'admin',
-  MANAGER = 'manager',
-  THERAPIST = 'therapist',
-  MEMBER = 'member',
-  VIEWER = 'viewer',
+
+  /** Gerente/supervisor de equipe (nível 200) */
+  GESTOR = 'gestor',
+
+  /** Funcionário padrão (nível 300) */
+  COLABORADOR = 'colaborador',
 }
 
 /**
- * Role hierarchy levels - higher number means more permissions.
+ * Níveis de hierarquia numéricos para papéis
+ * Número menor = maior privilégio
  */
 export const ROLE_HIERARCHY: Record<Role, number> = {
-  [Role.SUPER_ADMIN]: 100,
-  [Role.OWNER]: 90,
-  [Role.ADMIN]: 80,
-  [Role.MANAGER]: 60,
-  [Role.THERAPIST]: 50,
-  [Role.MEMBER]: 30,
-  [Role.VIEWER]: 10,
+  [Role.SUPER_ADMIN]: 0,
+  [Role.ADMIN]: 100,
+  [Role.GESTOR]: 200,
+  [Role.COLABORADOR]: 300,
 };
 
 /**
- * Checks if a user role has equal or higher privileges than the required role.
- *
- * @param userRole - The role the user has
- * @param requiredRole - The minimum role required for access
- * @returns true if userRole >= requiredRole in hierarchy
- *
+ * Verifica se o papel do usuário tem privilégios suficientes
+ * @param userRole - Papel atribuído ao usuário
+ * @param requiredRole - Papel mínimo requerido
+ * @returns true se o papel do usuário tem privilégios iguais ou superiores
  * @example
- * hasHigherRole(Role.ADMIN, Role.MEMBER) // true - admin > member
- * hasHigherRole(Role.MEMBER, Role.ADMIN) // false - member < admin
- * hasHigherRole(Role.ADMIN, Role.ADMIN) // true - equal roles allowed
+ * hasHigherRole(Role.ADMIN, Role.GESTOR) // true (Admin pode fazer o que Gestor faz)
+ * hasHigherRole(Role.COLABORADOR, Role.ADMIN) // false (Colaborador não pode fazer tarefas de Admin)
  */
 export function hasHigherRole(userRole: Role, requiredRole: Role): boolean {
-  return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole];
+  return ROLE_HIERARCHY[userRole] <= ROLE_HIERARCHY[requiredRole];
 }
 
 /**
- * Gets all roles that have equal or higher privileges than the given role.
- *
- * @param role - The minimum role level
- * @returns Array of roles with equal or higher privileges
+ * Obtém todos os papéis com privilégio igual ou menor que o papel fornecido
+ * @example
+ * getSubordinateRoles(Role.GESTOR) // [Role.GESTOR, Role.COLABORADOR]
  */
-export function getRolesAbove(role: Role): Role[] {
-  const minLevel = ROLE_HIERARCHY[role];
-  return Object.entries(ROLE_HIERARCHY)
-    .filter(([, level]) => level >= minLevel)
-    .map(([roleName]) => roleName as Role);
+export function getSubordinateRoles(role: Role): Role[] {
+  const level = ROLE_HIERARCHY[role];
+  return Object.values(Role).filter((r) => ROLE_HIERARCHY[r] >= level);
 }
 
 /**
