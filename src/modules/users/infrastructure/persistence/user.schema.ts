@@ -34,7 +34,9 @@ export class UserSchema {
   @Column({ type: 'text', nullable: true })
   bio?: string;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({
+    type: process.env.NODE_ENV === 'test' ? 'simple-json' : 'jsonb',
+  })
   preferences: UserPreferences;
 
   @Column({ name: 'supabase_user_id', unique: true, nullable: true })

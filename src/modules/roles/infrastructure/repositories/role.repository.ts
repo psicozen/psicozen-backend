@@ -1,6 +1,6 @@
 import { Injectable, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { TypeOrmBaseRepository } from '../../../../core/infrastructure/repositories/typeorm-base.repository';
 import { RoleEntity } from '../../domain/entities/role.entity';
 import { RoleSchema } from '../persistence/role.schema';
@@ -112,8 +112,9 @@ export class RoleRepository
     };
 
     // Para papéis globais (SUPER_ADMIN), organizationId é null
+    // Use IsNull() for proper NULL comparison in SQL
     if (organizationId === undefined || organizationId === null) {
-      whereCondition.organizationId = null;
+      whereCondition.organizationId = IsNull();
     } else {
       whereCondition.organizationId = organizationId;
     }
@@ -138,8 +139,9 @@ export class RoleRepository
       roleId,
     };
 
+    // Use IsNull() for proper NULL comparison in SQL
     if (organizationId === undefined || organizationId === null) {
-      whereCondition.organizationId = null;
+      whereCondition.organizationId = IsNull();
     } else {
       whereCondition.organizationId = organizationId;
     }
