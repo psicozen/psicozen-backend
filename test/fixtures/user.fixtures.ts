@@ -39,8 +39,7 @@ export function createUserFixture(
   options: CreateUserFixtureOptions = {},
 ): Partial<UserSchema> {
   const id = options.id ?? generateTestId();
-  const email =
-    options.email ?? `user${fixtureCounter}@test.com`.toLowerCase();
+  const email = options.email ?? `user${fixtureCounter}@test.com`.toLowerCase();
   const firstName = options.firstName ?? `Test${fixtureCounter}`;
   const lastName = options.lastName ?? `User`;
 

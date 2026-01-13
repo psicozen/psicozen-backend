@@ -90,7 +90,6 @@ describe('Role Assignment Integration Tests', () => {
       const userFixture = createUserFixture({ email: 'admin@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
 
-
       const orgA = createCompanyFixture({ name: 'Organization A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
 
@@ -131,7 +130,6 @@ describe('Role Assignment Integration Tests', () => {
       // Given: User with ADMIN in Org A
       const userFixture = createUserFixture({ email: 'multiorg@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
-
 
       const orgA = createCompanyFixture({ name: 'Organization A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
@@ -177,7 +175,6 @@ describe('Role Assignment Integration Tests', () => {
       const userFixture = createUserFixture({ email: 'diffroles@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
 
-
       const orgA = createCompanyFixture({ name: 'Company A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
 
@@ -218,7 +215,6 @@ describe('Role Assignment Integration Tests', () => {
       const userFixture = createUserFixture({ email: 'multiroles@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
 
-
       const orgA = createCompanyFixture({ name: 'Organization A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
 
@@ -254,7 +250,6 @@ describe('Role Assignment Integration Tests', () => {
       const userFixture = createUserFixture({ email: 'superadmin@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
 
-
       // When: Assign SUPER_ADMIN without organizationId (global)
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -284,7 +279,6 @@ describe('Role Assignment Integration Tests', () => {
       const userFixture = createUserFixture({ email: 'globaladmin@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
 
-
       const orgA = createCompanyFixture({ name: 'Organization A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
 
@@ -309,7 +303,6 @@ describe('Role Assignment Integration Tests', () => {
       // Given: User with SUPER_ADMIN globally
       const userFixture = createUserFixture({ email: 'coexist@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
-
 
       const orgA = createCompanyFixture({ name: 'Organization A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
@@ -353,7 +346,6 @@ describe('Role Assignment Integration Tests', () => {
       const userFixture = createUserFixture({ email: 'duplicate@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
 
-
       const orgA = createCompanyFixture({ name: 'Organization A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
 
@@ -383,7 +375,6 @@ describe('Role Assignment Integration Tests', () => {
       });
       const savedUser = await typeormUserRepository.save(userFixture);
 
-
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
         roleId: savedRoles.superAdmin.id,
@@ -407,7 +398,6 @@ describe('Role Assignment Integration Tests', () => {
       // Given: User has ADMIN in Org A
       const userFixture = createUserFixture({ email: 'difforg@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
-
 
       const orgA = createCompanyFixture({ name: 'Organization A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
@@ -454,7 +444,6 @@ describe('Role Assignment Integration Tests', () => {
       const userFixture = createUserFixture({ email: 'constraint@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
 
-
       const orgA = createCompanyFixture({ name: 'Organization A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
 
@@ -481,7 +470,6 @@ describe('Role Assignment Integration Tests', () => {
       // Given: User with role in organization
       const userFixture = createUserFixture({ email: 'cascade@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
-
 
       const orgA = createCompanyFixture({ name: 'Organization To Delete' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
@@ -521,7 +509,6 @@ describe('Role Assignment Integration Tests', () => {
       // Given: User and role
       const userFixture = createUserFixture({ email: 'nullorg@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
-
 
       const orgA = createCompanyFixture({ name: 'Organization A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
@@ -570,7 +557,6 @@ describe('Role Assignment Integration Tests', () => {
       const userFixture = createUserFixture({ email: 'methodtest@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
 
-
       const orgA = createCompanyFixture({ name: 'Organization A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
 
@@ -608,7 +594,6 @@ describe('Role Assignment Integration Tests', () => {
       const userFixture = createUserFixture({ email: 'globalmethod@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
 
-
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
         roleId: savedRoles.superAdmin.id,
@@ -631,7 +616,6 @@ describe('Role Assignment Integration Tests', () => {
       // Given: User with same role in two organizations
       const userFixture = createUserFixture({ email: 'removetest@test.com' });
       const savedUser = await typeormUserRepository.save(userFixture);
-
 
       const orgA = createCompanyFixture({ name: 'Organization A' });
       const savedOrgA = await typeormOrgRepository.save(orgA);
@@ -683,7 +667,6 @@ describe('Role Assignment Integration Tests', () => {
         email: 'removeglobal@test.com',
       });
       const savedUser = await typeormUserRepository.save(userFixture);
-
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
