@@ -84,7 +84,7 @@ export class AddOrganizationScopeToRBACTables1768105400000
             )
         );
       END;
-      $$ LANGUAGE plpgsql SECURITY DEFINER;
+      $$ LANGUAGE plpgsql SECURITY INVOKER;
     `);
 
     // 7. Create helper function to get user roles in organization
@@ -105,7 +105,7 @@ export class AddOrganizationScopeToRBACTables1768105400000
             OR ur.organization_id IS NULL  -- Include global roles
           );
       END;
-      $$ LANGUAGE plpgsql SECURITY DEFINER;
+      $$ LANGUAGE plpgsql SECURITY INVOKER;
     `);
 
     // 8. Create helper function to check if user has permission in organization
@@ -130,7 +130,7 @@ export class AddOrganizationScopeToRBACTables1768105400000
             )
         );
       END;
-      $$ LANGUAGE plpgsql SECURITY DEFINER;
+      $$ LANGUAGE plpgsql SECURITY INVOKER;
     `);
 
     // 9. Update organizations RLS policies to use organization-scoped checks
