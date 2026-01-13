@@ -5,6 +5,7 @@ import { TypeOrmBaseRepository } from '../../../../core/infrastructure/repositor
 import { UserEntity } from '../../domain/entities/user.entity';
 import { UserSchema } from '../persistence/user.schema';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
+import { Role } from '../../../roles/domain/enums/role.enum';
 
 @Injectable()
 export class UserRepository
@@ -72,5 +73,48 @@ export class UserRepository
       where: { email },
     });
     return count > 0;
+  }
+
+  async getRolesByOrganization(
+    userId: string,
+    organizationId?: string,
+  ): Promise<Role[]> {
+    const queryBuilder = this.repository
+      .createQueryBuilder('users')
+      .innerJoin('user_roles', 'ur', 'ur.user_id = users.id')
+      .innerJoin('roles', 'r', 'r.id = ur.role_id')
+      .where('users.id = :userId', { userId });
+
+    if (organizationId) {
+      // If organization ID is provided, get roles for that org OR system roles
+      queryBuilder.andWhere(
+        '(ur.organization_id = :organizationId OR r.is_system_role = true)',
+        { organizationId },
+      );
+    } else {
+      // If no organization ID, only return system roles (e.g., SUPER_ADMIN)
+      queryBuilder.andWhere('r.is_system_role = true');
+    }
+
+    const results = await queryBuilder
+      .select('DISTINCT r.name', 'roleName')
+      .getRawMany<{ roleName: string }>();
+
+    return results.map((r) => r.roleName as Role);
+  }
+
+  async findByRoles(
+    organizationId: string,
+    roles: Role[],
+  ): Promise<UserEntity[]> {
+    const schemas = await this.repository
+      .createQueryBuilder('users')
+      .innerJoin('user_roles', 'ur', 'ur.user_id = users.id')
+      .innerJoin('roles', 'r', 'r.id = ur.role_id')
+      .where('ur.organization_id = :organizationId', { organizationId })
+      .andWhere('r.name IN (:...roles)', { roles })
+      .getMany();
+
+    return schemas.map((schema) => this.toDomain(schema));
   }
 }

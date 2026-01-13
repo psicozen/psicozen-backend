@@ -16,7 +16,7 @@
 .idea/**/sqlDataSources.xml
 .idea/**/dynamic.xml
 .idea/**/uiDesigner.xml
-
+.claude/settings.local.json
 /scripts
 
 # Gradle:

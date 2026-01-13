@@ -20,8 +20,12 @@ import {
 // Presentation - Controllers
 import { OrganizationsController } from './presentation/controllers/organizations.controller';
 
+// Guards - requires UsersModule for USER_REPOSITORY
+import { RolesGuard } from '../../core/presentation/guards/roles.guard';
+import { UsersModule } from '../users/users.module';
+
 @Module({
-  imports: [TypeOrmModule.forFeature([OrganizationSchema])],
+  imports: [TypeOrmModule.forFeature([OrganizationSchema]), UsersModule],
   controllers: [OrganizationsController],
   providers: [
     // Repositories
@@ -36,6 +40,9 @@ import { OrganizationsController } from './presentation/controllers/organization
     ListOrganizationsUseCase,
     UpdateOrganizationSettingsUseCase,
     DeleteOrganizationUseCase,
+
+    // Guards
+    RolesGuard,
   ],
   exports: [ORGANIZATION_REPOSITORY],
 })
