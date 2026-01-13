@@ -47,7 +47,9 @@ export class AssignRoleToUserUseCase {
     // 1. Validar que usuário existe
     const user = await this.userRepository.findById(dto.userId);
     if (!user) {
-      throw new NotFoundException(`Usuário com ID ${dto.userId} não encontrado`);
+      throw new NotFoundException(
+        `Usuário com ID ${dto.userId} não encontrado`,
+      );
     }
 
     // 2. Validar que papel existe
@@ -64,8 +66,9 @@ export class AssignRoleToUserUseCase {
         );
       }
 
-      const organization =
-        await this.organizationRepository.findById(dto.organizationId);
+      const organization = await this.organizationRepository.findById(
+        dto.organizationId,
+      );
       if (!organization) {
         throw new NotFoundException(
           `Organização com ID ${dto.organizationId} não encontrada`,

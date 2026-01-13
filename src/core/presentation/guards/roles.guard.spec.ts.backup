@@ -34,9 +34,6 @@ describe('RolesGuard', () => {
 
   beforeEach(async () => {
     reflector = {
-      get: jest.fn(),
-      getAll: jest.fn(),
-      getAllAndMerge: jest.fn(),
       getAllAndOverride: jest.fn(),
     } as jest.Mocked<Reflector>;
 
@@ -85,21 +82,25 @@ describe('RolesGuard', () => {
   describe('canActivate', () => {
     describe('when no roles required', () => {
       it('should allow access when roles are undefined', async () => {
-        reflector.getAllAndOverride.mockReturnValue(undefined);
+        const getAllAndOverrideSpy = jest.spyOn(reflector, 'getAllAndOverride');
+        getAllAndOverrideSpy.mockReturnValue(undefined);
         createMockContext({ id: 'user-123' });
 
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
+        expect(getAllAndOverrideSpy).toHaveBeenCalled();
       });
 
       it('should allow access when roles array is empty', async () => {
-        reflector.getAllAndOverride.mockReturnValue([]);
+        const getAllAndOverrideSpy = jest.spyOn(reflector, 'getAllAndOverride');
+        getAllAndOverrideSpy.mockReturnValue([]);
         createMockContext({ id: 'user-123' });
 
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
+        expect(getAllAndOverrideSpy).toHaveBeenCalled();
       });
     });
 
@@ -127,16 +128,17 @@ describe('RolesGuard', () => {
       it('should allow SUPER_ADMIN access without organization ID', async () => {
         reflector.getAllAndOverride.mockReturnValue([Role.ADMIN]);
         createMockContext({ id: 'user-123' }, {});
-        userRepository.getRolesByOrganization.mockResolvedValue([
+        const rbofn = userRepository.getRolesByOrganization; rbofn.mockResolvedValue([
           Role.SUPER_ADMIN,
         ]);
 
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
-        expect(
-          jest.spyOn(userRepository, 'getRolesByOrganization'),
-        ).toHaveBeenCalledWith('user-123', undefined);
+        const getRolesByOrgSpy = jest.mocked(
+          const rbofn = userRepository.getRolesByOrganization; rbofn,
+        );
+        expect(getRolesByOrgSpy).toHaveBeenCalledWith('user-123', undefined);
       });
 
       it('should allow SUPER_ADMIN access to any route requiring any role', async () => {
@@ -145,7 +147,7 @@ describe('RolesGuard', () => {
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([
+        const rbofn = userRepository.getRolesByOrganization; rbofn.mockResolvedValue([
           Role.SUPER_ADMIN,
         ]);
 
@@ -177,9 +179,10 @@ describe('RolesGuard', () => {
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
-        expect(
-          jest.spyOn(userRepository, 'getRolesByOrganization'),
-        ).toHaveBeenCalledWith('user-123', 'org-123');
+        const getRolesByOrgSpy = jest.mocked(
+          const rbofn = userRepository.getRolesByOrganization; rbofn,
+        );
+        expect(getRolesByOrgSpy).toHaveBeenCalledWith('user-123', 'org-123');
       });
 
       it('should pass organization ID to repository', async () => {
@@ -188,15 +191,16 @@ describe('RolesGuard', () => {
           { id: 'user-456' },
           { 'x-organization-id': 'org-789' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([
+        const rbofn = userRepository.getRolesByOrganization; rbofn.mockResolvedValue([
           Role.COLABORADOR,
         ]);
 
         await guard.canActivate(mockExecutionContext);
 
-        expect(
-          jest.spyOn(userRepository, 'getRolesByOrganization'),
-        ).toHaveBeenCalledWith('user-456', 'org-789');
+        const getRolesByOrgSpy = jest.mocked(
+          const rbofn = userRepository.getRolesByOrganization; rbofn,
+        );
+        expect(getRolesByOrgSpy).toHaveBeenCalledWith('user-456', 'org-789');
       });
     });
 
@@ -233,7 +237,7 @@ describe('RolesGuard', () => {
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([
+        const rbofn = userRepository.getRolesByOrganization; rbofn.mockResolvedValue([
           Role.COLABORADOR,
         ]);
 
@@ -248,7 +252,7 @@ describe('RolesGuard', () => {
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([
+        const rbofn = userRepository.getRolesByOrganization; rbofn.mockResolvedValue([
           Role.SUPER_ADMIN,
         ]);
 
@@ -263,7 +267,7 @@ describe('RolesGuard', () => {
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([
+        const rbofn = userRepository.getRolesByOrganization; rbofn.mockResolvedValue([
           Role.COLABORADOR,
         ]);
 
@@ -285,10 +289,14 @@ describe('RolesGuard', () => {
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
+        const getRolesByOrgSpy = jest.mocked(
+          const rbofn = userRepository.getRolesByOrganization; rbofn,
+        );
+        expect(getRolesByOrgSpy).toHaveBeenCalledWith('user-123', 'org-123');
       });
 
       it('should allow access if user has higher role than any required', async () => {
-        reflector.getAllAndOverride.mockReturnValue([
+        const gaofn = reflector.getAllAndOverride; gaofn.mockReturnValue([
           Role.GESTOR,
           Role.COLABORADOR,
         ]);
@@ -301,6 +309,10 @@ describe('RolesGuard', () => {
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
+        const getRolesByOrgSpy = jest.mocked(
+          const rbofn = userRepository.getRolesByOrganization; rbofn,
+        );
+        expect(getRolesByOrgSpy).toHaveBeenCalledWith('user-123', 'org-123');
       });
 
       it('should deny access if user has lower role than all required', async () => {
@@ -309,13 +321,17 @@ describe('RolesGuard', () => {
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([
+        const rbofn = userRepository.getRolesByOrganization; rbofn.mockResolvedValue([
           Role.COLABORADOR,
         ]);
 
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(false);
+        const getRolesByOrgSpy = jest.mocked(
+          const rbofn = userRepository.getRolesByOrganization; rbofn,
+        );
+        expect(getRolesByOrgSpy).toHaveBeenCalledWith('user-123', 'org-123');
       });
     });
 
@@ -326,7 +342,7 @@ describe('RolesGuard', () => {
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([
+        const rbofn = userRepository.getRolesByOrganization; rbofn.mockResolvedValue([
           Role.COLABORADOR,
           Role.GESTOR,
           Role.ADMIN,
@@ -335,6 +351,10 @@ describe('RolesGuard', () => {
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
+        const getRolesByOrgSpy = jest.mocked(
+          const rbofn = userRepository.getRolesByOrganization; rbofn,
+        );
+        expect(getRolesByOrgSpy).toHaveBeenCalledWith('user-123', 'org-123');
       });
 
       it('should use highest user role (lowest hierarchy number) for access', async () => {
@@ -343,7 +363,7 @@ describe('RolesGuard', () => {
           { id: 'user-123' },
           { 'x-organization-id': 'org-123' },
         );
-        userRepository.getRolesByOrganization.mockResolvedValue([
+        const rbofn = userRepository.getRolesByOrganization; rbofn.mockResolvedValue([
           Role.COLABORADOR,
           Role.ADMIN, // This should grant access (hierarchy 100 < 200)
         ]);
@@ -351,6 +371,10 @@ describe('RolesGuard', () => {
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
+        const getRolesByOrgSpy = jest.mocked(
+          const rbofn = userRepository.getRolesByOrganization; rbofn,
+        );
+        expect(getRolesByOrgSpy).toHaveBeenCalledWith('user-123', 'org-123');
       });
     });
 
@@ -366,6 +390,10 @@ describe('RolesGuard', () => {
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(false);
+        const getRolesByOrgSpy = jest.mocked(
+          const rbofn = userRepository.getRolesByOrganization; rbofn,
+        );
+        expect(getRolesByOrgSpy).toHaveBeenCalledWith('user-123', 'org-123');
       });
 
       it('should handle user not in organization', async () => {
@@ -379,6 +407,10 @@ describe('RolesGuard', () => {
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(false);
+        const getRolesByOrgSpy = jest.mocked(
+          const rbofn = userRepository.getRolesByOrganization; rbofn,
+        );
+        expect(getRolesByOrgSpy).toHaveBeenCalledWith('user-123', 'org-123');
       });
 
       it('should correctly use reflector to get roles metadata', async () => {
@@ -391,10 +423,15 @@ describe('RolesGuard', () => {
 
         await guard.canActivate(mockExecutionContext);
 
-        expect(jest.spyOn(reflector, 'getAllAndOverride')).toHaveBeenCalledWith(
+        const getAllAndOverrideFn = reflector.getAllAndOverride;
+        expect(jest.mocked(getAllAndOverrideFn)).toHaveBeenCalledWith(
           ROLES_KEY,
           [mockExecutionContext.getHandler(), mockExecutionContext.getClass()],
         );
+        const getRolesByOrgSpy = jest.mocked(
+          const rbofn = userRepository.getRolesByOrganization; rbofn,
+        );
+        expect(getRolesByOrgSpy).toHaveBeenCalledWith('user-123', 'org-123');
       });
     });
   });
