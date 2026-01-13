@@ -79,25 +79,42 @@ export class UserRepository
     userId: string,
     organizationId?: string,
   ): Promise<Role[]> {
-    const queryBuilder = this.repository.manager
-      .createQueryBuilder()
-      .select('DISTINCT r.name', 'name')
-      .from('user_roles', 'ur')
-      .innerJoin('roles', 'r', 'ur.role_id = r.id')
-      .where('ur.user_id = :userId', { userId });
+    const queryBuilder = this.repository
+      .createQueryBuilder('users')
+      .innerJoin('user_roles', 'ur', 'ur.user_id = users.id')
+      .innerJoin('roles', 'r', 'r.id = ur.role_id')
+      .where('users.id = :userId', { userId });
 
     if (organizationId) {
-      // If organization ID is provided, get roles for that org plus global roles
+      // If organization ID is provided, get roles for that org OR system roles
       queryBuilder.andWhere(
-        '(ur.organization_id = :organizationId OR ur.organization_id IS NULL)',
+        '(ur.organization_id = :organizationId OR r.is_system_role = true)',
         { organizationId },
       );
     } else {
-      // If no organization ID, only return global roles (organization_id IS NULL)
-      queryBuilder.andWhere('ur.organization_id IS NULL');
+      // If no organization ID, only return system roles (e.g., SUPER_ADMIN)
+      queryBuilder.andWhere('r.is_system_role = true');
     }
 
-    const results = await queryBuilder.getRawMany<{ name: string }>();
-    return results.map((r) => r.name as Role);
+    const results = await queryBuilder
+      .select('DISTINCT r.name', 'roleName')
+      .getRawMany<{ roleName: string }>();
+
+    return results.map((r) => r.roleName as Role);
+  }
+
+  async findByRoles(
+    organizationId: string,
+    roles: Role[],
+  ): Promise<UserEntity[]> {
+    const schemas = await this.repository
+      .createQueryBuilder('users')
+      .innerJoin('user_roles', 'ur', 'ur.user_id = users.id')
+      .innerJoin('roles', 'r', 'r.id = ur.role_id')
+      .where('ur.organization_id = :organizationId', { organizationId })
+      .andWhere('r.name IN (:...roles)', { roles })
+      .getMany();
+
+    return schemas.map((schema) => this.toDomain(schema));
   }
 }
