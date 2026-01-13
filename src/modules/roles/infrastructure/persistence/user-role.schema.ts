@@ -4,10 +4,14 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { OrganizationSchema } from '../../../../modules/organizations/infrastructure/persistence/organization.schema';
 
 @Entity('user_roles')
-@Index(['userId', 'roleId'], { unique: true })
+@Index(['userId', 'roleId', 'organizationId'], { unique: true })
+@Index(['organizationId'])
 export class UserRoleSchema {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -17,6 +21,13 @@ export class UserRoleSchema {
 
   @Column({ name: 'role_id' })
   roleId: string;
+
+  @Column({ name: 'organization_id', nullable: true })
+  organizationId?: string;
+
+  @ManyToOne(() => OrganizationSchema, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'organization_id' })
+  organization?: OrganizationSchema;
 
   @Column({ name: 'assigned_by' })
   assignedBy: string;

@@ -5,6 +5,7 @@ import { TypeOrmBaseRepository } from '../../../../core/infrastructure/repositor
 import { UserEntity } from '../../domain/entities/user.entity';
 import { UserSchema } from '../persistence/user.schema';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
+import { Role } from '../../../roles/domain/enums/role.enum';
 
 @Injectable()
 export class UserRepository
@@ -72,5 +73,31 @@ export class UserRepository
       where: { email },
     });
     return count > 0;
+  }
+
+  async getRolesByOrganization(
+    userId: string,
+    organizationId?: string,
+  ): Promise<Role[]> {
+    const queryBuilder = this.repository.manager
+      .createQueryBuilder()
+      .select('DISTINCT r.name', 'name')
+      .from('user_roles', 'ur')
+      .innerJoin('roles', 'r', 'ur.role_id = r.id')
+      .where('ur.user_id = :userId', { userId });
+
+    if (organizationId) {
+      // If organization ID is provided, get roles for that org plus global roles
+      queryBuilder.andWhere(
+        '(ur.organization_id = :organizationId OR ur.organization_id IS NULL)',
+        { organizationId },
+      );
+    } else {
+      // If no organization ID, only return global roles (organization_id IS NULL)
+      queryBuilder.andWhere('ur.organization_id IS NULL');
+    }
+
+    const results = await queryBuilder.getRawMany<{ name: string }>();
+    return results.map((r) => r.name as Role);
   }
 }
