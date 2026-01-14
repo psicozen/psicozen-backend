@@ -4,12 +4,32 @@ import { Repository } from 'typeorm';
 import { UserRepository } from './user.repository';
 import { UserSchema } from '../persistence/user.schema';
 import { UserEntity } from '../../domain/entities/user.entity';
+import { Role } from '../../../roles/domain/enums/role.enum';
 
 describe('UserRepository', () => {
   let repository: UserRepository;
   let typeOrmRepository: jest.Mocked<Repository<UserSchema>>;
+  let mockQueryBuilder: {
+    select: jest.Mock;
+    from: jest.Mock;
+    innerJoin: jest.Mock;
+    where: jest.Mock;
+    andWhere: jest.Mock;
+    getRawMany: jest.Mock;
+    getMany: jest.Mock;
+  };
 
   beforeEach(async () => {
+    mockQueryBuilder = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn(),
+      getMany: jest.fn(),
+    };
+
     const mockTypeOrmRepository = {
       findOne: jest.fn(),
       find: jest.fn(),
@@ -19,6 +39,10 @@ describe('UserRepository', () => {
       softDelete: jest.fn(),
       findAndCount: jest.fn(),
       count: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+      manager: {
+        createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -181,6 +205,163 @@ describe('UserRepository', () => {
       expect(schema.firstName).toBe(domain.firstName);
       expect(schema.lastName).toBe(domain.lastName);
       expect(schema.supabaseUserId).toBe(domain.supabaseUserId);
+    });
+  });
+
+  describe('getRolesByOrganization', () => {
+    it('should return roles for a specific organization including system roles', async () => {
+      const userId = 'user-123';
+      const organizationId = 'org-456';
+
+      mockQueryBuilder.getRawMany.mockResolvedValue([
+        { roleName: 'admin' },
+        { roleName: 'super_admin' },
+      ]);
+
+      const result = await repository.getRolesByOrganization(
+        userId,
+        organizationId,
+      );
+
+      expect(result).toEqual([Role.ADMIN, Role.SUPER_ADMIN]);
+      expect(mockQueryBuilder.innerJoin).toHaveBeenCalledWith(
+        'user_roles',
+        'ur',
+        'ur.user_id = users.id',
+      );
+      expect(mockQueryBuilder.innerJoin).toHaveBeenCalledWith(
+        'roles',
+        'r',
+        'r.id = ur.role_id',
+      );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'users.id = :userId',
+        { userId },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        '(ur.organization_id = :organizationId OR r.is_system_role = true)',
+        { organizationId },
+      );
+      expect(mockQueryBuilder.select).toHaveBeenCalledWith(
+        'DISTINCT r.name',
+        'roleName',
+      );
+    });
+
+    it('should return only system roles when no organizationId is provided', async () => {
+      const userId = 'user-123';
+
+      mockQueryBuilder.getRawMany.mockResolvedValue([
+        { roleName: 'super_admin' },
+      ]);
+
+      const result = await repository.getRolesByOrganization(userId);
+
+      expect(result).toEqual([Role.SUPER_ADMIN]);
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'r.is_system_role = true',
+      );
+    });
+
+    it('should return empty array when user has no roles', async () => {
+      const userId = 'user-123';
+      const organizationId = 'org-456';
+
+      mockQueryBuilder.getRawMany.mockResolvedValue([]);
+
+      const result = await repository.getRolesByOrganization(
+        userId,
+        organizationId,
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    it('should handle SUPER_ADMIN system role correctly', async () => {
+      const userId = 'super-admin-user';
+
+      mockQueryBuilder.getRawMany.mockResolvedValue([
+        { roleName: 'super_admin' },
+      ]);
+
+      const result = await repository.getRolesByOrganization(userId);
+
+      expect(result).toContain(Role.SUPER_ADMIN);
+    });
+  });
+
+  describe('findByRoles', () => {
+    it('should find users by roles in an organization', async () => {
+      const organizationId = 'org-456';
+      const roles = [Role.ADMIN, Role.MANAGER];
+
+      const mockSchemas = [
+        {
+          id: 'user-1',
+          email: 'admin@example.com',
+          firstName: 'Admin',
+          preferences: {
+            language: 'en',
+            theme: 'light',
+            notifications: true,
+            timezone: 'UTC',
+          },
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'user-2',
+          email: 'manager@example.com',
+          firstName: 'Manager',
+          preferences: {
+            language: 'en',
+            theme: 'light',
+            notifications: true,
+            timezone: 'UTC',
+          },
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ] as UserSchema[];
+
+      mockQueryBuilder.getMany.mockResolvedValue(mockSchemas);
+
+      const result = await repository.findByRoles(organizationId, roles);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toBeInstanceOf(UserEntity);
+      expect(result[1]).toBeInstanceOf(UserEntity);
+      expect(mockQueryBuilder.innerJoin).toHaveBeenCalledWith(
+        'user_roles',
+        'ur',
+        'ur.user_id = users.id',
+      );
+      expect(mockQueryBuilder.innerJoin).toHaveBeenCalledWith(
+        'roles',
+        'r',
+        'r.id = ur.role_id',
+      );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'ur.organization_id = :organizationId',
+        { organizationId },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'r.name IN (:...roles)',
+        { roles },
+      );
+    });
+
+    it('should return empty array when no users have the specified roles', async () => {
+      const organizationId = 'org-456';
+      const roles = [Role.ADMIN];
+
+      mockQueryBuilder.getMany.mockResolvedValue([]);
+
+      const result = await repository.findByRoles(organizationId, roles);
+
+      expect(result).toEqual([]);
     });
   });
 });

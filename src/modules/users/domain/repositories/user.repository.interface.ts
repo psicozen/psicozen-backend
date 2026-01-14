@@ -20,6 +20,15 @@ export interface IUserRepository extends IBaseRepository<UserEntity> {
     userId: string,
     organizationId?: string,
   ): Promise<Role[]>;
+
+  /**
+   * Find users by roles in an organization (useful for notifications/alerts).
+   *
+   * @param organizationId - The organization ID to search within
+   * @param roles - Array of Role enum values to search for
+   * @returns Array of UserEntity matching any of the specified roles
+   */
+  findByRoles(organizationId: string, roles: Role[]): Promise<UserEntity[]>;
 }
 
 export const USER_REPOSITORY = Symbol('IUserRepository');
