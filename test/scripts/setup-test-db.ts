@@ -49,22 +49,14 @@ async function setupTestDatabase() {
     const rolesNum = parseInt(rolesCount[0].count, 10);
 
     if (rolesNum === 0) {
-      console.log('⚠️  No system roles found. Creating seed data...');
-
-      // Insert system roles
-      await dataSource.query(`
-        INSERT INTO roles (name, description, is_system_role, hierarchy_level, created_at, updated_at)
-        VALUES
-          ('super_admin', 'Super Administrator with global access', true, 0, now(), now()),
-          ('admin', 'Organization Administrator', true, 100, now(), now()),
-          ('gestor', 'Organization Manager', true, 200, now(), now()),
-          ('colaborador', 'Organization Collaborator', true, 300, now(), now())
-        ON CONFLICT (name) DO UPDATE SET
-          hierarchy_level = EXCLUDED.hierarchy_level,
-          is_system_role = EXCLUDED.is_system_role;
-      `);
-
-      console.log('✅ System roles created');
+      console.error(
+        '\n❌ No system roles found! Migrations have not been run properly.',
+      );
+      console.log(
+        'Please ensure all migrations have been executed. Run: npm run migration:run',
+      );
+      await dataSource.destroy();
+      process.exit(1);
     } else {
       console.log(`✅ Found ${rolesNum} system roles`);
     }

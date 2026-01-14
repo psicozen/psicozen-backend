@@ -92,6 +92,7 @@ jobs:
       - name: Run Gemini Code Review
         if: github.event.pull_request.head.repo.full_name == github.repository
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}

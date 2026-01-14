@@ -1,4 +1,4 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { DataSource } from 'typeorm';
 import { runInTransaction } from '../../infrastructure/database/rls.storage';
@@ -6,6 +6,8 @@ import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class RlsMiddleware implements NestMiddleware {
+  private readonly logger = new Logger(RlsMiddleware.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
@@ -80,7 +82,7 @@ export class RlsMiddleware implements NestMiddleware {
                   await queryRunner.commitTransaction();
                 }
               } catch (err) {
-                console.error('Error finishing RLS transaction', err);
+                this.logger.error('Error finishing RLS transaction', err);
               } finally {
                 await queryRunner.release();
                 resolve();
