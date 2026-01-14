@@ -19,7 +19,7 @@ import {
  * - Constraint de verificação para emotion_level (1-10)
  * - Dados iniciais das categorias
  */
-export class CreateEmociogramaTablesAndRLS1736784000000
+export class CreateEmociogramaTablesAndRLS1768105450000
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -382,7 +382,7 @@ export class CreateEmociogramaTablesAndRLS1736784000000
         EXISTS (
           SELECT 1 FROM users u
           WHERE u.supabase_user_id = auth.uid()
-            AND public.user_has_role(u.id, 'super_admin')
+            AND public.user_has_role(u.id, 'super_admin', NULL::uuid)
         )
       )
     `);
@@ -396,7 +396,7 @@ export class CreateEmociogramaTablesAndRLS1736784000000
         EXISTS (
           SELECT 1 FROM users u
           WHERE u.supabase_user_id = auth.uid()
-            AND public.user_has_role(u.id, 'super_admin')
+            AND public.user_has_role(u.id, 'super_admin', NULL::uuid)
         )
       )
     `);
@@ -410,7 +410,7 @@ export class CreateEmociogramaTablesAndRLS1736784000000
         EXISTS (
           SELECT 1 FROM users u
           WHERE u.supabase_user_id = auth.uid()
-            AND public.user_has_role(u.id, 'super_admin')
+            AND public.user_has_role(u.id, 'super_admin', NULL::uuid)
         )
       )
     `);
@@ -424,7 +424,7 @@ export class CreateEmociogramaTablesAndRLS1736784000000
         EXISTS (
           SELECT 1 FROM users u
           WHERE u.supabase_user_id = auth.uid()
-            AND public.user_has_role(u.id, 'super_admin')
+            AND public.user_has_role(u.id, 'super_admin', NULL::uuid)
         )
       )
     `);
@@ -461,7 +461,7 @@ export class CreateEmociogramaTablesAndRLS1736784000000
           WHERE u.supabase_user_id = auth.uid()
             AND (
               public.user_has_role(u.id, 'admin', emociograma_submissions.organization_id)
-              OR public.user_has_role(u.id, 'super_admin')
+              OR public.user_has_role(u.id, 'super_admin', NULL::uuid)
             )
         )
         AND deleted_at IS NULL
@@ -508,7 +508,7 @@ export class CreateEmociogramaTablesAndRLS1736784000000
           WHERE u.supabase_user_id = auth.uid()
             AND (
               public.user_has_role(u.id, 'admin', emociograma_submissions.organization_id)
-              OR public.user_has_role(u.id, 'super_admin')
+              OR public.user_has_role(u.id, 'super_admin', NULL::uuid)
             )
         )
       )
@@ -539,7 +539,7 @@ export class CreateEmociogramaTablesAndRLS1736784000000
           WHERE u.supabase_user_id = auth.uid()
             AND (
               public.user_has_role(u.id, 'admin', emociograma_submissions.organization_id)
-              OR public.user_has_role(u.id, 'super_admin')
+              OR public.user_has_role(u.id, 'super_admin', NULL::uuid)
             )
         )
       )

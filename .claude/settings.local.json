@@ -21,6 +21,18 @@
       "Bash(dir:*)",
       "Bash(tree:*)",
       "Bash(npm run format:*)"
+      "Bash(npm run test:e2e:*)",
+      "Bash(chmod:*)",
+      "Bash(bash:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npm run test:migrate:*)",
+      "Bash(NODE_ENV=test npm run typeorm:*)",
+      "Bash(for i in 1 2 3)",
+      "Bash(do echo -e \"\\\\n========== Run #$i ==========\")",
+      "Bash(done)",
+      "Bash(npm run migration:show:*)",
+      "Bash(PGPASSWORD='Psze@2026projeto' psql:*)",
+      "Bash(grep:*)"
     ]
   }
 }

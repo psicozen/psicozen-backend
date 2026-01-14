@@ -35,9 +35,20 @@ import { createUserFixture } from './fixtures/user.fixtures';
 import { createDefaultRoles } from './fixtures/role.fixtures';
 import { createCompanyFixture } from './fixtures/organization.fixtures';
 
+// Test Database Utilities
+import { testDataSourceOptions } from './config/test-datasource';
+import {
+  initializeTestDatabase,
+  clearDatabase,
+  closeDatabase,
+  runAsServiceRole,
+} from './utils/test-database.helper';
+import { resetAllFixtures } from './utils/reset-fixtures.helper';
+
 /**
  * E2E Tests for RBAC (Role-Based Access Control)
  *
+ * Uses PostgreSQL staging database (Render) for realistic testing.
  * Tests the authorization system with multi-organization support:
  * - Role-based endpoint access
  * - Organization isolation (users can only access their org's data)
@@ -142,22 +153,13 @@ describe('RBAC Authorization (e2e)', () => {
   let currentTestUser: TestUser | null = null;
 
   beforeAll(async () => {
+    // Initialize PostgreSQL test database
+    await initializeTestDatabase();
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
-        TypeOrmModule.forRoot({
-          type: 'better-sqlite3',
-          database: ':memory:',
-          entities: [
-            UserSchema,
-            RoleSchema,
-            PermissionSchema,
-            UserRoleSchema,
-            OrganizationSchema,
-          ],
-          synchronize: true,
-          dropSchema: true,
-          logging: false,
-        }),
+        // PostgreSQL staging database (Render)
+        TypeOrmModule.forRoot(testDataSourceOptions),
         TypeOrmModule.forFeature([
           UserSchema,
           RoleSchema,
@@ -189,94 +191,165 @@ describe('RBAC Authorization (e2e)', () => {
     userRoleRepository = dataSource.getRepository(UserRoleSchema);
     orgRepository = dataSource.getRepository(OrganizationSchema);
 
-    // Create roles
-    const roles = createDefaultRoles();
+    // Fetch existing system roles (created by migrations)
+    // Do not create new roles - they already exist as seed data
+    const superAdminRole = await roleRepository.findOne({
+      where: { name: Role.SUPER_ADMIN },
+    });
+    const adminRole = await roleRepository.findOne({
+      where: { name: Role.ADMIN },
+    });
+    const gestorRole = await roleRepository.findOne({
+      where: { name: Role.GESTOR },
+    });
+    const colaboradorRole = await roleRepository.findOne({
+      where: { name: Role.COLABORADOR },
+    });
+
+    if (!superAdminRole || !adminRole || !gestorRole || !colaboradorRole) {
+      throw new Error(
+        'System roles not found in database. Run migrations first: npm run test:migrate',
+      );
+    }
+
     savedRoles = {
-      superAdmin: await roleRepository.save(roles.superAdmin),
-      admin: await roleRepository.save(roles.admin),
-      gestor: await roleRepository.save(roles.gestor),
-      colaborador: await roleRepository.save(roles.colaborador),
+      superAdmin: superAdminRole,
+      admin: adminRole,
+      gestor: gestorRole,
+      colaborador: colaboradorRole,
     };
 
-    // Create organizations
-    const org1Fixture = createCompanyFixture({ name: 'Organization 1' });
-    const org2Fixture = createCompanyFixture({ name: 'Organization 2' });
-    org1 = await orgRepository.save(org1Fixture);
-    org2 = await orgRepository.save(org2Fixture);
-
-    // Create users
-    const superAdminFixture = createUserFixture({
-      email: 'superadmin@test.com',
-    });
-    const adminOrg1Fixture = createUserFixture({ email: 'admin1@test.com' });
-    const gestorOrg1Fixture = createUserFixture({ email: 'gestor1@test.com' });
-    const colaboradorOrg1Fixture = createUserFixture({
-      email: 'colaborador1@test.com',
-    });
-    const adminOrg2Fixture = createUserFixture({ email: 'admin2@test.com' });
-    const gestorOrg2Fixture = createUserFixture({ email: 'gestor2@test.com' });
-
-    users = {
-      superAdmin: await userRepository.save(superAdminFixture),
-      adminOrg1: await userRepository.save(adminOrg1Fixture),
-      gestorOrg1: await userRepository.save(gestorOrg1Fixture),
-      colaboradorOrg1: await userRepository.save(colaboradorOrg1Fixture),
-      adminOrg2: await userRepository.save(adminOrg2Fixture),
-      gestorOrg2: await userRepository.save(gestorOrg2Fixture),
-    };
-
-    // Assign roles
-    // SUPER_ADMIN (global)
-    await userRoleRepository.save({
-      userId: users.superAdmin.id,
-      roleId: savedRoles.superAdmin.id,
-      organizationId: null,
-      assignedBy: users.superAdmin.id,
-    });
-
-    // ADMIN in Org 1
-    await userRoleRepository.save({
-      userId: users.adminOrg1.id,
-      roleId: savedRoles.admin.id,
-      organizationId: org1.id,
-      assignedBy: users.superAdmin.id,
-    });
-
-    // GESTOR in Org 1
-    await userRoleRepository.save({
-      userId: users.gestorOrg1.id,
-      roleId: savedRoles.gestor.id,
-      organizationId: org1.id,
-      assignedBy: users.adminOrg1.id,
-    });
-
-    // COLABORADOR in Org 1
-    await userRoleRepository.save({
-      userId: users.colaboradorOrg1.id,
-      roleId: savedRoles.colaborador.id,
-      organizationId: org1.id,
-      assignedBy: users.gestorOrg1.id,
-    });
-
-    // ADMIN in Org 2
-    await userRoleRepository.save({
-      userId: users.adminOrg2.id,
-      roleId: savedRoles.admin.id,
-      organizationId: org2.id,
-      assignedBy: users.superAdmin.id,
-    });
-
-    // GESTOR in Org 2
-    await userRoleRepository.save({
-      userId: users.gestorOrg2.id,
-      roleId: savedRoles.gestor.id,
-      organizationId: org2.id,
-      assignedBy: users.adminOrg2.id,
-    });
+    // Note: Test data (organizations, users, user_roles) are now created
+    // in beforeEach to ensure test isolation. Only system roles are loaded here.
   });
 
   afterAll(async () => {
     await app.close();
+    await closeDatabase();
+  });
+
+  beforeEach(async () => {
+    // Reset fixture counters to prevent conflicts across multiple test runs
+    resetAllFixtures();
+    // Clear test data using the helper (preserves seed roles)
+    await clearDatabase();
+
+    // Then create fixtures in service role context
+    const testData = await runAsServiceRole(async () => {
+      // Get repositories from transaction manager to use RLS context
+      const { getTransactionManager } = await import(
+        '../src/core/infrastructure/database/rls.storage'
+      );
+      const transactionManager = getTransactionManager();
+
+      if (!transactionManager) {
+        throw new Error(
+          'Transaction manager not available in runAsServiceRole context',
+        );
+      }
+
+      const txOrgRepo = transactionManager.getRepository(OrganizationSchema);
+      const txUserRepo = transactionManager.getRepository(UserSchema);
+      const txUserRoleRepo = transactionManager.getRepository(UserRoleSchema);
+
+      // Recreate test data
+      // Create organizations
+      const org1Fixture = createCompanyFixture({ name: 'Organization 1' });
+      const org2Fixture = createCompanyFixture({ name: 'Organization 2' });
+      const org1 = await txOrgRepo.save(org1Fixture);
+      const org2 = await txOrgRepo.save(org2Fixture);
+
+      // Create users with supabaseUserId
+      const superAdminFixture = createUserFixture({
+        email: 'superadmin@test.com',
+        supabaseUserId: '00000002-0000-0000-0000-000000000001',
+      });
+      const adminOrg1Fixture = createUserFixture({
+        email: 'admin1@test.com',
+        supabaseUserId: '00000002-0000-0000-0000-000000000002',
+      });
+      const gestorOrg1Fixture = createUserFixture({
+        email: 'gestor1@test.com',
+        supabaseUserId: '00000002-0000-0000-0000-000000000003',
+      });
+      const colaboradorOrg1Fixture = createUserFixture({
+        email: 'colaborador1@test.com',
+        supabaseUserId: '00000002-0000-0000-0000-000000000004',
+      });
+      const adminOrg2Fixture = createUserFixture({
+        email: 'admin2@test.com',
+        supabaseUserId: '00000002-0000-0000-0000-000000000005',
+      });
+      const gestorOrg2Fixture = createUserFixture({
+        email: 'gestor2@test.com',
+        supabaseUserId: '00000002-0000-0000-0000-000000000006',
+      });
+
+      const users = {
+        superAdmin: await txUserRepo.save(superAdminFixture),
+        adminOrg1: await txUserRepo.save(adminOrg1Fixture),
+        gestorOrg1: await txUserRepo.save(gestorOrg1Fixture),
+        colaboradorOrg1: await txUserRepo.save(colaboradorOrg1Fixture),
+        adminOrg2: await txUserRepo.save(adminOrg2Fixture),
+        gestorOrg2: await txUserRepo.save(gestorOrg2Fixture),
+      };
+
+      // Assign roles
+      // SUPER_ADMIN (global)
+      await txUserRoleRepo.save({
+        userId: users.superAdmin.id,
+        roleId: savedRoles.superAdmin.id,
+        organizationId: null,
+        assignedBy: users.superAdmin.id,
+      });
+
+      // ADMIN in Org 1
+      await txUserRoleRepo.save({
+        userId: users.adminOrg1.id,
+        roleId: savedRoles.admin.id,
+        organizationId: org1.id,
+        assignedBy: users.superAdmin.id,
+      });
+
+      // GESTOR in Org 1
+      await txUserRoleRepo.save({
+        userId: users.gestorOrg1.id,
+        roleId: savedRoles.gestor.id,
+        organizationId: org1.id,
+        assignedBy: users.adminOrg1.id,
+      });
+
+      // COLABORADOR in Org 1
+      await txUserRoleRepo.save({
+        userId: users.colaboradorOrg1.id,
+        roleId: savedRoles.colaborador.id,
+        organizationId: org1.id,
+        assignedBy: users.gestorOrg1.id,
+      });
+
+      // ADMIN in Org 2
+      await txUserRoleRepo.save({
+        userId: users.adminOrg2.id,
+        roleId: savedRoles.admin.id,
+        organizationId: org2.id,
+        assignedBy: users.superAdmin.id,
+      });
+
+      // GESTOR in Org 2
+      await txUserRoleRepo.save({
+        userId: users.gestorOrg2.id,
+        roleId: savedRoles.gestor.id,
+        organizationId: org2.id,
+        assignedBy: users.adminOrg2.id,
+      });
+
+      return { org1, org2, users };
+    });
+
+    // Assign to outer scope variables
+    org1 = testData.org1;
+    org2 = testData.org2;
+    users = testData.users;
   });
 
   afterEach(() => {
