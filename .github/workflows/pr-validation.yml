@@ -47,6 +47,18 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Create .env.test file
+        run: |
+          cat > .env.test << EOF
+          NODE_ENV=test
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM=test@psicozen.com
+          THROTTLE_TTL=60
+          THROTTLE_LIMIT=100
+          EOF
+          echo "✅ .env.test file created"
+
       - name: Run E2E Tests
         run: npm run test:e2e
         env:
