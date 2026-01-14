@@ -29,6 +29,9 @@ import { LogoutUseCase } from './application/use-cases/logout.use-case';
 // Core
 import { SupabaseModule } from '../../core/infrastructure/supabase/supabase.module';
 
+// Modules
+import { UsersModule } from '../users/users.module';
+
 @Module({
   imports: [
     ConfigModule,
@@ -49,6 +52,7 @@ import { SupabaseModule } from '../../core/infrastructure/supabase/supabase.modu
     }),
     TypeOrmModule.forFeature([SessionSchema]),
     SupabaseModule,
+    UsersModule,
   ],
   controllers: [AuthController],
   providers: [

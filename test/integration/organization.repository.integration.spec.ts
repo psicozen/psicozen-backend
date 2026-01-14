@@ -7,7 +7,10 @@ import {
   clearDatabase,
   closeDatabase,
   getTestDataSource,
+  runAsServiceRole,
 } from '../utils/test-database.helper';
+import { getTransactionManager } from '../../src/core/infrastructure/database/rls.storage';
+import { resetAllFixtures } from '../utils/reset-fixtures.helper';
 import {
   createCompanyFixture,
   createDepartmentFixture,
@@ -27,6 +30,8 @@ describe('OrganizationRepository Integration Tests', () => {
   });
 
   afterEach(async () => {
+    // Reset fixture counters to prevent conflicts across multiple test runs
+    resetAllFixtures();
     await clearDatabase();
   });
 
@@ -163,36 +168,53 @@ describe('OrganizationRepository Integration Tests', () => {
     });
 
     it('should order children by createdAt ASC', async () => {
-      const parent = createCompanyFixture({ name: 'Parent Company' });
-      await typeormRepository.save(parent);
+      await runAsServiceRole(async () => {
+        // Create parent using repository (uses transaction context)
+        const parentData = OrganizationEntity.create({
+          name: 'Parent Company',
+          type: 'company',
+        });
+        const parent = await repository.create(parentData);
 
-      const child1 = createDepartmentFixture({
-        name: 'First Department',
-        parentId: parent.id,
+        // Create children with explicit createdAt timestamps
+        const child1Data = OrganizationEntity.create({
+          name: 'First Department',
+          type: 'department',
+          parentId: parent.id,
+        });
+        const child1 = await repository.create(child1Data);
+        // Update createdAt after creation
+        await typeormRepository.update(child1.id, {
+          createdAt: new Date('2024-01-01'),
+        });
+
+        const child2Data = OrganizationEntity.create({
+          name: 'Second Department',
+          type: 'department',
+          parentId: parent.id,
+        });
+        const child2 = await repository.create(child2Data);
+        await typeormRepository.update(child2.id, {
+          createdAt: new Date('2024-01-02'),
+        });
+
+        const child3Data = OrganizationEntity.create({
+          name: 'Third Department',
+          type: 'department',
+          parentId: parent.id,
+        });
+        const child3 = await repository.create(child3Data);
+        await typeormRepository.update(child3.id, {
+          createdAt: new Date('2024-01-03'),
+        });
+
+        const children = await repository.findChildren(parent.id);
+
+        expect(children).toHaveLength(3);
+        expect(children[0].name).toBe('First Department');
+        expect(children[1].name).toBe('Second Department');
+        expect(children[2].name).toBe('Third Department');
       });
-      child1.createdAt = new Date('2024-01-01');
-      await typeormRepository.save(child1);
-
-      const child2 = createDepartmentFixture({
-        name: 'Second Department',
-        parentId: parent.id,
-      });
-      child2.createdAt = new Date('2024-01-02');
-      await typeormRepository.save(child2);
-
-      const child3 = createDepartmentFixture({
-        name: 'Third Department',
-        parentId: parent.id,
-      });
-      child3.createdAt = new Date('2024-01-03');
-      await typeormRepository.save(child3);
-
-      const children = await repository.findChildren(parent.id);
-
-      expect(children).toHaveLength(3);
-      expect(children[0].name).toBe('First Department');
-      expect(children[1].name).toBe('Second Department');
-      expect(children[2].name).toBe('Third Department');
     });
 
     it('should exclude soft-deleted children', async () => {
@@ -241,15 +263,18 @@ describe('OrganizationRepository Integration Tests', () => {
     });
 
     it('should filter inactive organizations', async () => {
-      const activeCompany = createCompanyFixture({
-        name: 'Active Company',
-        isActive: true,
+      // CRITICAL: Create fixtures within runAsServiceRole to ensure proper RLS context
+      await runAsServiceRole(async () => {
+        const activeCompany = createCompanyFixture({
+          name: 'Active Company',
+          isActive: true,
+        });
+        const inactiveCompany = createCompanyFixture({
+          name: 'Inactive Company',
+          isActive: false,
+        });
+        await typeormRepository.save([activeCompany, inactiveCompany]);
       });
-      const inactiveCompany = createCompanyFixture({
-        name: 'Inactive Company',
-        isActive: false,
-      });
-      await typeormRepository.save([activeCompany, inactiveCompany]);
 
       const result = await repository.findActiveByType('company');
 
@@ -258,17 +283,25 @@ describe('OrganizationRepository Integration Tests', () => {
     });
 
     it('should order by name ASC', async () => {
-      const companyC = createCompanyFixture({ name: 'Charlie Corp' });
-      const companyA = createCompanyFixture({ name: 'Alpha Inc' });
-      const companyB = createCompanyFixture({ name: 'Beta Ltd' });
-      await typeormRepository.save([companyC, companyA, companyB]);
+      await runAsServiceRole(async () => {
+        // Create companies using repository (uses transaction context)
+        await repository.create(
+          OrganizationEntity.create({ name: 'Charlie Corp', type: 'company' }),
+        );
+        await repository.create(
+          OrganizationEntity.create({ name: 'Alpha Inc', type: 'company' }),
+        );
+        await repository.create(
+          OrganizationEntity.create({ name: 'Beta Ltd', type: 'company' }),
+        );
 
-      const result = await repository.findActiveByType('company');
+        const result = await repository.findActiveByType('company');
 
-      expect(result).toHaveLength(3);
-      expect(result[0].name).toBe('Alpha Inc');
-      expect(result[1].name).toBe('Beta Ltd');
-      expect(result[2].name).toBe('Charlie Corp');
+        expect(result).toHaveLength(3);
+        expect(result[0].name).toBe('Alpha Inc');
+        expect(result[1].name).toBe('Beta Ltd');
+        expect(result[2].name).toBe('Charlie Corp');
+      });
     });
 
     it('should exclude soft-deleted organizations', async () => {
@@ -342,30 +375,41 @@ describe('OrganizationRepository Integration Tests', () => {
 
   describe('update', () => {
     it('should update organization', async () => {
-      const fixture = createCompanyFixture({ name: 'Original Name' });
-      await typeormRepository.save(fixture);
+      await runAsServiceRole(async () => {
+        // Create using repository (uses transaction context)
+        const orgData = OrganizationEntity.create({
+          name: 'Original Name',
+          type: 'company',
+        });
+        const created = await repository.create(orgData);
 
-      const updated = await repository.update(fixture.id, {
-        name: 'New Name',
+        const updated = await repository.update(created.id, {
+          name: 'New Name',
+        });
+
+        expect(updated.name).toBe('New Name');
       });
-
-      expect(updated.name).toBe('New Name');
     });
 
     it('should update multiple fields', async () => {
-      const fixture = createCompanyFixture({
-        name: 'Original',
-        isActive: true,
-      });
-      await typeormRepository.save(fixture);
+      await runAsServiceRole(async () => {
+        // Create using repository (uses transaction context)
+        const orgData = OrganizationEntity.create({
+          name: 'Original',
+          type: 'company',
+        });
+        const created = await repository.create(orgData);
+        // Verify initial isActive state
+        expect(created.isActive).toBe(true);
 
-      const updated = await repository.update(fixture.id, {
-        name: 'Updated',
-        isActive: false,
-      });
+        const updated = await repository.update(created.id, {
+          name: 'Updated',
+          isActive: false,
+        });
 
-      expect(updated.name).toBe('Updated');
-      expect(updated.isActive).toBe(false);
+        expect(updated.name).toBe('Updated');
+        expect(updated.isActive).toBe(false);
+      });
     });
   });
 
@@ -385,17 +429,29 @@ describe('OrganizationRepository Integration Tests', () => {
 
   describe('softDelete', () => {
     it('should soft delete organization', async () => {
-      const fixture = createCompanyFixture({ name: 'To Soft Delete' });
-      await typeormRepository.save(fixture);
+      await runAsServiceRole(async () => {
+        // Create using repository (uses transaction context)
+        const orgData = OrganizationEntity.create({
+          name: 'To Soft Delete',
+          type: 'company',
+        });
+        const created = await repository.create(orgData);
 
-      await repository.softDelete(fixture.id);
+        await repository.softDelete(created.id);
 
-      const found = await typeormRepository.findOne({
-        where: { id: fixture.id },
-        withDeleted: true,
+        // Use getTransactionManager to get the correct repository
+        const manager = getTransactionManager();
+        const transactionalRepo = manager
+          ? manager.getRepository(OrganizationSchema)
+          : typeormRepository;
+
+        const found = await transactionalRepo.findOne({
+          where: { id: created.id },
+          withDeleted: true,
+        });
+        expect(found).toBeDefined();
+        expect(found?.deletedAt).toBeDefined();
       });
-      expect(found).toBeDefined();
-      expect(found?.deletedAt).toBeDefined();
     });
   });
 

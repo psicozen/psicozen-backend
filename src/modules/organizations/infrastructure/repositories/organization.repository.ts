@@ -9,6 +9,7 @@ import {
   OrganizationType,
   DEFAULT_ORGANIZATION_SETTINGS,
 } from '../../domain/types/organization-settings.types';
+import { getTransactionManager } from '../../../../core/infrastructure/database/rls.storage';
 
 @Injectable()
 export class OrganizationRepository
@@ -58,7 +59,12 @@ export class OrganizationRepository
   }
 
   async findChildren(parentId: string): Promise<OrganizationEntity[]> {
-    const schemas = await this.repository.find({
+    const manager = getTransactionManager();
+    const repo = manager
+      ? manager.getRepository<OrganizationSchema>(this.repository.target)
+      : this.repository;
+
+    const schemas = await repo.find({
       where: { parentId, deletedAt: IsNull() },
       order: { createdAt: 'ASC' },
     });
@@ -68,7 +74,12 @@ export class OrganizationRepository
   async findActiveByType(
     type: OrganizationType,
   ): Promise<OrganizationEntity[]> {
-    const schemas = await this.repository.find({
+    const manager = getTransactionManager();
+    const repo = manager
+      ? manager.getRepository<OrganizationSchema>(this.repository.target)
+      : this.repository;
+
+    const schemas = await repo.find({
       where: {
         type,
         isActive: true,

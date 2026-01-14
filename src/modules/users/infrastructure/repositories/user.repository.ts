@@ -86,14 +86,16 @@ export class UserRepository
       .where('users.id = :userId', { userId });
 
     if (organizationId) {
-      // If organization ID is provided, get roles for that org OR system roles
+      // If organization ID is provided, get:
+      // 1. Roles assigned specifically to this organization
+      // 2. Global roles (assigned with NULL organization_id, e.g., SUPER_ADMIN)
       queryBuilder.andWhere(
-        '(ur.organization_id = :organizationId OR r.is_system_role = true)',
+        '(ur.organization_id = :organizationId OR ur.organization_id IS NULL)',
         { organizationId },
       );
     } else {
-      // If no organization ID, only return system roles (e.g., SUPER_ADMIN)
-      queryBuilder.andWhere('r.is_system_role = true');
+      // If no organization ID, only return global roles (SUPER_ADMIN)
+      queryBuilder.andWhere('ur.organization_id IS NULL');
     }
 
     const results = await queryBuilder

@@ -122,8 +122,12 @@ export class AddOrganizationScopeToRBACTables1768105400000
     `);
 
     // Drop the index that was created with the unique constraint
+    // FIXED: The actual index name is IDX_user_roles_unique (not IDX_user_roles_user_role)
     await queryRunner.query(`
       DROP INDEX IF EXISTS "IDX_user_roles_user_role";
+    `);
+    await queryRunner.query(`
+      DROP INDEX IF EXISTS "IDX_user_roles_unique";
     `);
 
     // Add new unique constraint (user_id, role_id, organization_id)

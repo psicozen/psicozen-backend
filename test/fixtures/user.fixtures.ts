@@ -2,6 +2,8 @@ import { UserSchema } from '../../src/modules/users/infrastructure/persistence/u
 import { UserPreferences } from '../../src/modules/users/domain/entities/user.entity';
 
 let fixtureCounter = 0;
+// Unique session ID to prevent conflicts across multiple test runs
+const SESSION_ID = Date.now().toString(36);
 
 const DEFAULT_USER_PREFERENCES: UserPreferences = {
   language: 'en',
@@ -39,7 +41,10 @@ export function createUserFixture(
   options: CreateUserFixtureOptions = {},
 ): Partial<UserSchema> {
   const id = options.id ?? generateTestId();
-  const email = options.email ?? `user${fixtureCounter}@test.com`.toLowerCase();
+  // Add SESSION_ID to email to ensure uniqueness across test runs
+  const email = options.email
+    ? `${options.email.split('@')[0]}-${SESSION_ID}@${options.email.split('@')[1]}`
+    : `user${fixtureCounter}-${SESSION_ID}@test.com`.toLowerCase();
   const firstName = options.firstName ?? `Test${fixtureCounter}`;
   const lastName = options.lastName ?? `User`;
 

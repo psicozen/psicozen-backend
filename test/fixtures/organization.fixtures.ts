@@ -5,6 +5,8 @@ import {
 } from '../../src/modules/organizations/domain/types/organization-settings.types';
 
 let fixtureCounter = 0;
+// Unique session ID to prevent conflicts across multiple test runs
+const SESSION_ID = Date.now().toString(36);
 
 function generateTestId(): string {
   fixtureCounter++;
@@ -29,7 +31,18 @@ export function createOrganizationFixture(
 ): Partial<OrganizationSchema> {
   const id = options.id ?? generateTestId();
   const name = options.name ?? `Test Organization ${fixtureCounter}`;
-  const slug = options.slug ?? name.toLowerCase().replace(/\s+/g, '-');
+
+  // CRITICAL FIX: Only add SESSION_ID suffix if slug is NOT explicitly provided
+  // This respects test expectations when a specific slug is needed
+  let slug: string;
+  if (options.slug) {
+    // Explicit slug provided - use it as-is (for specific test scenarios)
+    slug = options.slug;
+  } else {
+    // Auto-generated slug - add SESSION_ID for uniqueness across test runs
+    const baseSlug = name.toLowerCase().replace(/\s+/g, '-');
+    slug = `${baseSlug}-${SESSION_ID}`;
+  }
 
   return {
     id,
