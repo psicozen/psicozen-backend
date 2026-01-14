@@ -237,7 +237,9 @@ export class EmociogramaSubmissionEntity extends BaseEntity {
       params.emotionLevel < 1 ||
       params.emotionLevel > 10
     ) {
-      errors.emotionLevel = ['O nível de emoção deve ser um inteiro entre 1 e 10'];
+      errors.emotionLevel = [
+        'O nível de emoção deve ser um inteiro entre 1 e 10',
+      ];
     }
 
     // Validar comprimento do comentário (máx 1000 caracteres)

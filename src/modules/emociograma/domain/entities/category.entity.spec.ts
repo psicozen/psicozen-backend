@@ -108,7 +108,9 @@ describe('EmociogramaCategoryEntity', () => {
         EmociogramaCategoryEntity.create(params);
       } catch (error) {
         expect(error).toBeInstanceOf(ValidationException);
-        expect((error as ValidationException).errors.displayOrder).toBeDefined();
+        expect(
+          (error as ValidationException).errors.displayOrder,
+        ).toBeDefined();
       }
     });
   });

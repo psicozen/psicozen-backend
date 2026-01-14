@@ -45,7 +45,9 @@ export class EmociogramaCategoryEntity extends BaseEntity {
   /**
    * Método factory para criar uma nova categoria com validação
    */
-  static create(params: CreateEmociogramaCategoryParams): EmociogramaCategoryEntity {
+  static create(
+    params: CreateEmociogramaCategoryParams,
+  ): EmociogramaCategoryEntity {
     EmociogramaCategoryEntity.validateCreateParams(params);
 
     return new EmociogramaCategoryEntity({
@@ -102,7 +104,9 @@ export class EmociogramaCategoryEntity extends BaseEntity {
 
     if (params.displayOrder !== undefined) {
       if (params.displayOrder < 0) {
-        errors.displayOrder = ['A ordem de exibição deve ser maior ou igual a zero'];
+        errors.displayOrder = [
+          'A ordem de exibição deve ser maior ou igual a zero',
+        ];
       } else {
         this.displayOrder = params.displayOrder;
       }
@@ -136,7 +140,9 @@ export class EmociogramaCategoryEntity extends BaseEntity {
   /**
    * Valida os parâmetros de criação
    */
-  private static validateCreateParams(params: CreateEmociogramaCategoryParams): void {
+  private static validateCreateParams(
+    params: CreateEmociogramaCategoryParams,
+  ): void {
     const errors: Record<string, string[]> = {};
 
     // Validar nome
@@ -150,7 +156,9 @@ export class EmociogramaCategoryEntity extends BaseEntity {
     if (params.displayOrder === undefined || params.displayOrder === null) {
       errors.displayOrder = ['A ordem de exibição é obrigatória'];
     } else if (params.displayOrder < 0) {
-      errors.displayOrder = ['A ordem de exibição deve ser maior ou igual a zero'];
+      errors.displayOrder = [
+        'A ordem de exibição deve ser maior ou igual a zero',
+      ];
     }
 
     if (Object.keys(errors).length > 0) {
