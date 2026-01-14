@@ -1,5 +1,13 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
+import { DataSource } from 'typeorm';
+
+// Import entities directly to avoid dynamic import issues in CI
+import { OrganizationSchema } from '../src/modules/organizations/infrastructure/persistence/organization.schema';
+import { UserSchema } from '../src/modules/users/infrastructure/persistence/user.schema';
+import { RoleSchema } from '../src/modules/roles/infrastructure/persistence/role.schema';
+import { PermissionSchema } from '../src/modules/roles/infrastructure/persistence/permission.schema';
+import { UserRoleSchema } from '../src/modules/roles/infrastructure/persistence/user-role.schema';
 
 /**
  * Global E2E Test Setup
@@ -19,19 +27,45 @@ export default async (): Promise<void> => {
 
     if (result.error) {
       // Don't fail if .env.test doesn't exist - use system env vars (CI)
-      console.log('ℹ️  .env.test not found, using system environment variables (CI mode)');
+      console.log(
+        'ℹ️  .env.test not found, using system environment variables (CI mode)',
+      );
     } else {
-      console.log('✅ Environment variables loaded from .env.test (local mode)');
+      console.log(
+        '✅ Environment variables loaded from .env.test (local mode)',
+      );
     }
     console.log('🔧 Setting up E2E test environment...');
 
-    // Create a new DataSource instance directly for global setup
-    const { DataSource } = await import('typeorm');
-    const { getTestDataSourceOptions } = await import(
-      './config/test-datasource.js'
-    );
-
-    const dataSource = new DataSource(getTestDataSourceOptions());
+    // Create DataSource with inline configuration to avoid module resolution issues
+    const dataSource = new DataSource({
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false,
+      },
+      extra: {
+        max: 10,
+        connectionTimeoutMillis: 10000,
+      },
+      entities: [
+        OrganizationSchema,
+        UserSchema,
+        RoleSchema,
+        PermissionSchema,
+        UserRoleSchema,
+      ],
+      migrations: [
+        resolve(
+          __dirname,
+          '../src/core/infrastructure/database/migrations/*{.ts,.js}',
+        ),
+      ],
+      migrationsRun: false,
+      synchronize: false,
+      dropSchema: false,
+      logging: false,
+    });
 
     // Initialize database connection
     await dataSource.initialize();
