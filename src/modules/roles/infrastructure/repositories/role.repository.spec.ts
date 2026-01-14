@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull, FindOperator, DeleteResult } from 'typeorm';
 import { ConflictException } from '@nestjs/common';
 import { RoleRepository } from './role.repository';
 import { RoleSchema } from '../persistence/role.schema';
@@ -114,6 +114,7 @@ describe('RoleRepository', () => {
 
       expect(result).toBeInstanceOf(RoleEntity);
       expect(result?.name).toBe('admin');
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(roleRepository.findOne).toHaveBeenCalledWith({
         where: { name: 'admin' },
       });
@@ -125,6 +126,7 @@ describe('RoleRepository', () => {
       const result = await repository.findByName('nonexistent');
 
       expect(result).toBeNull();
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(roleRepository.findOne).toHaveBeenCalledWith({
         where: { name: 'nonexistent' },
       });
@@ -145,6 +147,7 @@ describe('RoleRepository', () => {
 
       await repository.assignRoleToUser(assignData);
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(userRoleRepository.count).toHaveBeenCalledWith({
         where: {
           userId: assignData.userId,
@@ -152,6 +155,7 @@ describe('RoleRepository', () => {
           organizationId: assignData.organizationId,
         },
       });
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(userRoleRepository.save).toHaveBeenCalled();
     });
 
@@ -164,6 +168,7 @@ describe('RoleRepository', () => {
       await expect(repository.assignRoleToUser(assignData)).rejects.toThrow(
         'Usuário já possui este papel nesta organização',
       );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(userRoleRepository.save).not.toHaveBeenCalled();
     });
 
@@ -179,13 +184,20 @@ describe('RoleRepository', () => {
 
       await repository.assignRoleToUser(globalData);
 
-      expect(userRoleRepository.count).toHaveBeenCalledWith({
-        where: {
-          userId: globalData.userId,
-          roleId: globalData.roleId,
-          organizationId: null,
-        },
-      });
+      // Verify that IsNull() is used for proper NULL comparison
+      const countCalls = userRoleRepository.count.mock.calls;
+      expect(countCalls.length).toBeGreaterThan(0);
+      const callArg = countCalls[0][0];
+      expect(callArg.where).toBeDefined();
+      const whereClause = callArg.where as {
+        userId: string;
+        roleId: string;
+        organizationId: FindOperator<null>;
+      };
+      expect(whereClause.userId).toBe(globalData.userId);
+      expect(whereClause.roleId).toBe(globalData.roleId);
+      expect(whereClause.organizationId).toBeInstanceOf(FindOperator);
+      expect(whereClause.organizationId).toEqual(IsNull());
     });
 
     it('should handle unique constraint violation from database', async () => {
@@ -219,6 +231,7 @@ describe('RoleRepository', () => {
       );
 
       expect(result).toBe(true);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(userRoleRepository.count).toHaveBeenCalledWith({
         where: {
           userId: 'user-123',
@@ -249,22 +262,35 @@ describe('RoleRepository', () => {
       );
 
       expect(result).toBe(true);
-      expect(userRoleRepository.count).toHaveBeenCalledWith({
-        where: {
-          userId: 'user-123',
-          roleId: 'role-456',
-          organizationId: null,
-        },
-      });
+
+      // Verify that IsNull() is used for proper NULL comparison
+      const countCalls = userRoleRepository.count.mock.calls;
+      expect(countCalls.length).toBeGreaterThan(0);
+      const callArg = countCalls[0][0];
+      expect(callArg.where).toBeDefined();
+      const whereClause = callArg.where as {
+        userId: string;
+        roleId: string;
+        organizationId: FindOperator<null>;
+      };
+      expect(whereClause.userId).toBe('user-123');
+      expect(whereClause.roleId).toBe('role-456');
+      expect(whereClause.organizationId).toBeInstanceOf(FindOperator);
+      expect(whereClause.organizationId).toEqual(IsNull());
     });
   });
 
   describe('removeRoleFromUser', () => {
     it('should remove role from user in organization', async () => {
-      userRoleRepository.delete.mockResolvedValue({} as any);
+      const deleteResult: DeleteResult = {
+        affected: 1,
+        raw: {},
+      };
+      userRoleRepository.delete.mockResolvedValue(deleteResult);
 
       await repository.removeRoleFromUser('user-123', 'role-456', 'org-789');
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(userRoleRepository.delete).toHaveBeenCalledWith({
         userId: 'user-123',
         roleId: 'role-456',
@@ -273,15 +299,26 @@ describe('RoleRepository', () => {
     });
 
     it('should remove global role (no organizationId)', async () => {
-      userRoleRepository.delete.mockResolvedValue({} as any);
+      const deleteResult: DeleteResult = {
+        affected: 1,
+        raw: {},
+      };
+      userRoleRepository.delete.mockResolvedValue(deleteResult);
 
       await repository.removeRoleFromUser('user-123', 'role-456');
 
-      expect(userRoleRepository.delete).toHaveBeenCalledWith({
-        userId: 'user-123',
-        roleId: 'role-456',
-        organizationId: null,
-      });
+      // Verify that IsNull() is used for proper NULL comparison
+      const deleteCalls = userRoleRepository.delete.mock.calls;
+      expect(deleteCalls.length).toBeGreaterThan(0);
+      const callArg = deleteCalls[0][0] as {
+        userId: string;
+        roleId: string;
+        organizationId: FindOperator<null>;
+      };
+      expect(callArg.userId).toBe('user-123');
+      expect(callArg.roleId).toBe('role-456');
+      expect(callArg.organizationId).toBeInstanceOf(FindOperator);
+      expect(callArg.organizationId).toEqual(IsNull());
     });
   });
 });
