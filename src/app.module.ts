@@ -23,6 +23,7 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
 
 // Core - Middleware
 import { OrganizationContextMiddleware } from './core/presentation/middleware/organization-context.middleware';
+import { RlsMiddleware } from './core/presentation/middlewares/rls.middleware';
 
 // Legacy (to be removed)
 import { AppController } from './app.controller';
@@ -80,6 +81,8 @@ import { AppService } from './app.service';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(OrganizationContextMiddleware).forRoutes('*');
+    consumer
+      .apply(RlsMiddleware, OrganizationContextMiddleware)
+      .forRoutes('*');
   }
 }

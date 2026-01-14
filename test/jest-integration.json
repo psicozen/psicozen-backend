@@ -7,6 +7,7 @@
   },
   "testEnvironment": "node",
   "setupFiles": ["<rootDir>/set-test-env.ts"],
+  "globalSetup": "<rootDir>/setup-integration-global.ts",
   "setupFilesAfterEnv": ["<rootDir>/setup-integration.ts"],
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/../src/$1"
@@ -15,5 +16,6 @@
     "../src/**/*.repository.ts"
   ],
   "coverageDirectory": "../coverage-integration",
-  "testTimeout": 30000
+  "testTimeout": 60000,
+  "maxWorkers": 1
 }

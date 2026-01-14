@@ -6,6 +6,7 @@ import {
   PaginatedResult,
 } from '../../domain/repositories/base.repository.interface';
 import { NotFoundException } from '../../domain/exceptions';
+import { getTransactionManager } from '../database/rls.storage';
 
 /**
  * Interface para entidades que possuem um campo id
@@ -25,19 +26,25 @@ export abstract class TypeOrmBaseRepository<
   abstract toEntity(domain: Partial<TDomain>): TEntity;
 
   async findById(id: string): Promise<TDomain | null> {
-    const entity = await this.repository.findOne({
+    const manager = getTransactionManager();
+    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
+    
+    const entity = await repo.findOne({
       where: { id } as FindOptionsWhere<TEntity>,
     });
     return entity ? this.toDomain(entity) : null;
   }
 
   async findAll(options?: FindOptions): Promise<PaginatedResult<TDomain>> {
+    const manager = getTransactionManager();
+    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
+
     const page = options?.skip
       ? Math.floor(options.skip / (options.take || 10)) + 1
       : 1;
     const limit = options?.take || 10;
 
-    const [entities, total] = await this.repository.findAndCount({
+    const [entities, total] = await repo.findAndCount({
       skip: options?.skip,
       take: options?.take,
       order: options?.orderBy as FindOptionsOrder<TEntity>,
@@ -54,17 +61,23 @@ export abstract class TypeOrmBaseRepository<
   }
 
   async create(domain: Partial<TDomain>): Promise<TDomain> {
+    const manager = getTransactionManager();
+    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
+
     const entity = this.toEntity(domain);
-    const saved = await this.repository.save(entity);
+    const saved = await repo.save(entity);
     return this.toDomain(saved);
   }
 
   async update(id: string, partial: Partial<TDomain>): Promise<TDomain> {
-    await this.repository.update(
+    const manager = getTransactionManager();
+    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
+
+    await repo.update(
       id,
       this.toEntity(partial) as QueryDeepPartialEntity<TEntity>,
     );
-    const updated = await this.repository.findOne({
+    const updated = await repo.findOne({
       where: { id } as FindOptionsWhere<TEntity>,
     });
 
@@ -76,10 +89,14 @@ export abstract class TypeOrmBaseRepository<
   }
 
   async delete(id: string): Promise<void> {
-    await this.repository.delete(id);
+    const manager = getTransactionManager();
+    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
+    await repo.delete(id);
   }
 
   async softDelete(id: string): Promise<void> {
-    await this.repository.softDelete(id);
+    const manager = getTransactionManager();
+    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
+    await repo.softDelete(id);
   }
 }

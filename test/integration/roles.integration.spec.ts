@@ -13,15 +13,13 @@ import {
   clearDatabase,
   closeDatabase,
   getTestDataSource,
+  ensureSeedRolesExist,
+  runAsServiceRole,
 } from '../utils/test-database.helper';
 import {
   createUserFixture,
   createUsersForRoleTesting,
 } from '../fixtures/user.fixtures';
-import {
-  createDefaultRoles,
-  createRoleByName,
-} from '../fixtures/role.fixtures';
 import {
   createCompanyFixture,
   createDepartmentFixture,
@@ -46,6 +44,8 @@ describe('Role Assignment Integration Tests', () => {
 
   beforeAll(async () => {
     await initializeTestDatabase();
+    await ensureSeedRolesExist(); // Verify seed roles exist
+
     const dataSource = getTestDataSource();
 
     // Get TypeORM repositories
@@ -62,36 +62,62 @@ describe('Role Assignment Integration Tests', () => {
     userRepository = new UserRepository(typeormUserRepository);
     orgRepository = new OrganizationRepository(typeormOrgRepository);
 
-    // Create roles once and reuse them
-    const roles = createDefaultRoles();
+    // Fetch existing seed roles from database instead of creating
+    const superAdminRole = await typeormRoleRepository.findOne({
+      where: { name: Role.SUPER_ADMIN },
+    });
+    const adminRole = await typeormRoleRepository.findOne({
+      where: { name: Role.ADMIN },
+    });
+    const gestorRole = await typeormRoleRepository.findOne({
+      where: { name: Role.GESTOR },
+    });
+    const colaboradorRole = await typeormRoleRepository.findOne({
+      where: { name: Role.COLABORADOR },
+    });
+
+    // Assign to savedRoles object
     savedRoles = {
-      superAdmin: await typeormRoleRepository.save(roles.superAdmin),
-      admin: await typeormRoleRepository.save(roles.admin),
-      gestor: await typeormRoleRepository.save(roles.gestor),
-      colaborador: await typeormRoleRepository.save(roles.colaborador),
+      superAdmin: superAdminRole!,
+      admin: adminRole!,
+      gestor: gestorRole!,
+      colaborador: colaboradorRole!,
     };
+
+    console.log('✅ Using seed roles:', {
+      superAdmin: savedRoles.superAdmin.id,
+      admin: savedRoles.admin.id,
+      gestor: savedRoles.gestor.id,
+      colaborador: savedRoles.colaborador.id,
+    });
   });
 
   afterEach(async () => {
-    // Clear only user_roles, users, and organizations - keep roles
-    await typeormUserRoleRepository.clear();
-    await typeormUserRepository.clear();
-    await typeormOrgRepository.clear();
+    // Clear test data using proper cleanup function
+    // This preserves seed data (roles, permissions) while clearing user_roles, users, organizations
+    await clearDatabase();
   });
 
   afterAll(async () => {
-    await clearDatabase();
+    // No need to clearDatabase() here since afterEach() already handles it
     await closeDatabase();
   });
 
   describe('Multi-Organization Role Assignment', () => {
     it('should assign ADMIN role to user in organization A', async () => {
       // Given: User, ADMIN role, Organization A
-      const userFixture = createUserFixture({ email: 'admin@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA } = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'admin@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000001',
+        });
+        const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+        const orgA = createCompanyFixture({ name: 'Organization A' });
+        const savedOrgA = await typeormOrgRepository.save(orgA);
+
+        return { savedUser, savedOrgA };
+      });
 
       // When: Assign ADMIN to user in Org A
       await roleRepository.assignRoleToUser({
@@ -128,14 +154,23 @@ describe('Role Assignment Integration Tests', () => {
 
     it('should assign GESTOR role to same user in organization B', async () => {
       // Given: User with ADMIN in Org A
-      const userFixture = createUserFixture({ email: 'multiorg@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA, savedOrgB } = await runAsServiceRole(
+        async () => {
+          const userFixture = createUserFixture({
+            email: 'multiorg@test.com',
+            supabaseUserId: '00000001-0000-0000-0000-000000000002',
+          });
+          const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+          const orgA = createCompanyFixture({ name: 'Organization A' });
+          const savedOrgA = await typeormOrgRepository.save(orgA);
 
-      const orgB = createCompanyFixture({ name: 'Organization B' });
-      const savedOrgB = await typeormOrgRepository.save(orgB);
+          const orgB = createCompanyFixture({ name: 'Organization B' });
+          const savedOrgB = await typeormOrgRepository.save(orgB);
+
+          return { savedUser, savedOrgA, savedOrgB };
+        },
+      );
 
       // Assign ADMIN in Org A
       await roleRepository.assignRoleToUser({
@@ -172,14 +207,23 @@ describe('Role Assignment Integration Tests', () => {
 
     it('should allow different roles in different organizations', async () => {
       // Given: User with ADMIN in Org A and GESTOR in Org B
-      const userFixture = createUserFixture({ email: 'diffroles@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA, savedOrgB } = await runAsServiceRole(
+        async () => {
+          const userFixture = createUserFixture({
+            email: 'diffroles@test.com',
+            supabaseUserId: '00000001-0000-0000-0000-000000000003',
+          });
+          const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Company A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+          const orgA = createCompanyFixture({ name: 'Company A' });
+          const savedOrgA = await typeormOrgRepository.save(orgA);
 
-      const orgB = createCompanyFixture({ name: 'Company B' });
-      const savedOrgB = await typeormOrgRepository.save(orgB);
+          const orgB = createCompanyFixture({ name: 'Company B' });
+          const savedOrgB = await typeormOrgRepository.save(orgB);
+
+          return { savedUser, savedOrgA, savedOrgB };
+        },
+      );
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -212,11 +256,18 @@ describe('Role Assignment Integration Tests', () => {
 
     it('should allow same user multiple roles in same organization', async () => {
       // Given: User with ADMIN in Org A
-      const userFixture = createUserFixture({ email: 'multiroles@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA } = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'multiroles@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000004',
+        });
+        const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+        const orgA = createCompanyFixture({ name: 'Organization A' });
+        const savedOrgA = await typeormOrgRepository.save(orgA);
+
+        return { savedUser, savedOrgA };
+      });
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -247,8 +298,13 @@ describe('Role Assignment Integration Tests', () => {
   describe('Global Role Assignment (SUPER_ADMIN)', () => {
     it('should assign SUPER_ADMIN globally without organization', async () => {
       // Given: User, SUPER_ADMIN role
-      const userFixture = createUserFixture({ email: 'superadmin@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const savedUser = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'superadmin@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000005',
+        });
+        return typeormUserRepository.save(userFixture);
+      });
 
       // When: Assign SUPER_ADMIN without organizationId (global)
       await roleRepository.assignRoleToUser({
@@ -276,11 +332,18 @@ describe('Role Assignment Integration Tests', () => {
 
     it('should include SUPER_ADMIN in any organization query', async () => {
       // Given: User with SUPER_ADMIN globally
-      const userFixture = createUserFixture({ email: 'globaladmin@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA } = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'globaladmin@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000006',
+        });
+        const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+        const orgA = createCompanyFixture({ name: 'Organization A' });
+        const savedOrgA = await typeormOrgRepository.save(orgA);
+
+        return { savedUser, savedOrgA };
+      });
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -301,11 +364,18 @@ describe('Role Assignment Integration Tests', () => {
 
     it('should allow SUPER_ADMIN to coexist with org-specific roles', async () => {
       // Given: User with SUPER_ADMIN globally
-      const userFixture = createUserFixture({ email: 'coexist@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA } = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'coexist@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000007',
+        });
+        const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+        const orgA = createCompanyFixture({ name: 'Organization A' });
+        const savedOrgA = await typeormOrgRepository.save(orgA);
+
+        return { savedUser, savedOrgA };
+      });
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -343,11 +413,18 @@ describe('Role Assignment Integration Tests', () => {
   describe('Duplicate Role Assignment Prevention', () => {
     it('should prevent duplicate role assignment in same organization', async () => {
       // Given: User already has ADMIN in Org A
-      const userFixture = createUserFixture({ email: 'duplicate@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA } = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'duplicate@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000008',
+        });
+        const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+        const orgA = createCompanyFixture({ name: 'Organization A' });
+        const savedOrgA = await typeormOrgRepository.save(orgA);
+
+        return { savedUser, savedOrgA };
+      });
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -370,10 +447,13 @@ describe('Role Assignment Integration Tests', () => {
 
     it('should prevent duplicate global role assignment', async () => {
       // Given: User already has SUPER_ADMIN globally
-      const userFixture = createUserFixture({
-        email: 'duplicateglobal@test.com',
+      const savedUser = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'duplicateglobal@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000009',
+        });
+        return typeormUserRepository.save(userFixture);
       });
-      const savedUser = await typeormUserRepository.save(userFixture);
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -396,14 +476,23 @@ describe('Role Assignment Integration Tests', () => {
 
     it('should allow same role in different organizations', async () => {
       // Given: User has ADMIN in Org A
-      const userFixture = createUserFixture({ email: 'difforg@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA, savedOrgB } = await runAsServiceRole(
+        async () => {
+          const userFixture = createUserFixture({
+            email: 'difforg@test.com',
+            supabaseUserId: '00000001-0000-0000-0000-000000000010',
+          });
+          const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+          const orgA = createCompanyFixture({ name: 'Organization A' });
+          const savedOrgA = await typeormOrgRepository.save(orgA);
 
-      const orgB = createCompanyFixture({ name: 'Organization B' });
-      const savedOrgB = await typeormOrgRepository.save(orgB);
+          const orgB = createCompanyFixture({ name: 'Organization B' });
+          const savedOrgB = await typeormOrgRepository.save(orgB);
+
+          return { savedUser, savedOrgA, savedOrgB };
+        },
+      );
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -441,38 +530,56 @@ describe('Role Assignment Integration Tests', () => {
   describe('Database Constraints', () => {
     it('should enforce unique constraint on [userId, roleId, organizationId]', async () => {
       // Given: User with role in organization
-      const userFixture = createUserFixture({ email: 'constraint@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA } = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'constraint@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000011',
+        });
+        const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+        const orgA = createCompanyFixture({ name: 'Organization A' });
+        const savedOrgA = await typeormOrgRepository.save(orgA);
 
-      // Create first assignment
-      const userRole1 = new UserRoleSchema();
-      userRole1.userId = savedUser.id;
-      userRole1.roleId = savedRoles.admin.id;
-      userRole1.organizationId = savedOrgA.id;
-      userRole1.assignedBy = savedUser.id;
-      await typeormUserRoleRepository.save(userRole1);
+        // Create first assignment
+        const userRole1 = new UserRoleSchema();
+        userRole1.userId = savedUser.id;
+        userRole1.roleId = savedRoles.admin.id;
+        userRole1.organizationId = savedOrgA.id;
+        userRole1.assignedBy = savedUser.id;
+        await typeormUserRoleRepository.save(userRole1);
+
+        return { savedUser, savedOrgA };
+      });
 
       // When: Try to insert duplicate directly in database
-      const userRole2 = new UserRoleSchema();
-      userRole2.userId = savedUser.id;
-      userRole2.roleId = savedRoles.admin.id;
-      userRole2.organizationId = savedOrgA.id;
-      userRole2.assignedBy = savedUser.id;
+      await runAsServiceRole(async () => {
+        const userRole2 = new UserRoleSchema();
+        userRole2.userId = savedUser.id;
+        userRole2.roleId = savedRoles.admin.id;
+        userRole2.organizationId = savedOrgA.id;
+        userRole2.assignedBy = savedUser.id;
 
-      // Then: Should throw constraint violation error
-      await expect(typeormUserRoleRepository.save(userRole2)).rejects.toThrow();
+        // Then: Should throw constraint violation error
+        await expect(
+          typeormUserRoleRepository.save(userRole2),
+        ).rejects.toThrow();
+      });
     });
 
     it('should cascade delete user_roles when organization is deleted', async () => {
       // Given: User with role in organization
-      const userFixture = createUserFixture({ email: 'cascade@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA } = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'cascade@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000012',
+        });
+        const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization To Delete' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+        const orgA = createCompanyFixture({ name: 'Organization To Delete' });
+        const savedOrgA = await typeormOrgRepository.save(orgA);
+
+        return { savedUser, savedOrgA };
+      });
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -492,7 +599,9 @@ describe('Role Assignment Integration Tests', () => {
       expect(beforeDelete).toBe(1);
 
       // When: Delete organization
-      await typeormOrgRepository.delete(savedOrgA.id);
+      await runAsServiceRole(async () => {
+        await typeormOrgRepository.delete(savedOrgA.id);
+      });
 
       // Then: user_roles entry should also be deleted (CASCADE)
       const afterDelete = await typeormUserRoleRepository.count({
@@ -507,11 +616,18 @@ describe('Role Assignment Integration Tests', () => {
 
     it('should handle NULL organizationId in unique constraint', async () => {
       // Given: User and role
-      const userFixture = createUserFixture({ email: 'nullorg@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA } = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'nullorg@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000013',
+        });
+        const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+        const orgA = createCompanyFixture({ name: 'Organization A' });
+        const savedOrgA = await typeormOrgRepository.save(orgA);
+
+        return { savedUser, savedOrgA };
+      });
 
       // When: Assign same role with NULL and with organization
       await roleRepository.assignRoleToUser({
@@ -554,11 +670,23 @@ describe('Role Assignment Integration Tests', () => {
   describe('Repository Method Validation', () => {
     it('userHasRoleInOrganization should work for org-scoped roles', async () => {
       // Given: User with role in specific organization
-      const userFixture = createUserFixture({ email: 'methodtest@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA, savedOrgB } = await runAsServiceRole(
+        async () => {
+          const userFixture = createUserFixture({
+            email: 'methodtest@test.com',
+            supabaseUserId: '00000001-0000-0000-0000-000000000014',
+          });
+          const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+          const orgA = createCompanyFixture({ name: 'Organization A' });
+          const savedOrgA = await typeormOrgRepository.save(orgA);
+
+          const orgB = createCompanyFixture({ name: 'Organization B' });
+          const savedOrgB = await typeormOrgRepository.save(orgB);
+
+          return { savedUser, savedOrgA, savedOrgB };
+        },
+      );
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -578,9 +706,6 @@ describe('Role Assignment Integration Tests', () => {
       expect(hasRole).toBe(true);
 
       // Should return false for different organization
-      const orgB = createCompanyFixture({ name: 'Organization B' });
-      const savedOrgB = await typeormOrgRepository.save(orgB);
-
       const hasRoleInOrgB = await roleRepository.userHasRoleInOrganization(
         savedUser.id,
         savedRoles.gestor.id,
@@ -591,8 +716,13 @@ describe('Role Assignment Integration Tests', () => {
 
     it('userHasRoleInOrganization should work for global roles', async () => {
       // Given: User with global role
-      const userFixture = createUserFixture({ email: 'globalmethod@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const savedUser = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'globalmethod@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000015',
+        });
+        return typeormUserRepository.save(userFixture);
+      });
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -614,14 +744,23 @@ describe('Role Assignment Integration Tests', () => {
 
     it('removeRoleFromUser should remove org-specific role without affecting others', async () => {
       // Given: User with same role in two organizations
-      const userFixture = createUserFixture({ email: 'removetest@test.com' });
-      const savedUser = await typeormUserRepository.save(userFixture);
+      const { savedUser, savedOrgA, savedOrgB } = await runAsServiceRole(
+        async () => {
+          const userFixture = createUserFixture({
+            email: 'removetest@test.com',
+            supabaseUserId: '00000001-0000-0000-0000-000000000016',
+          });
+          const savedUser = await typeormUserRepository.save(userFixture);
 
-      const orgA = createCompanyFixture({ name: 'Organization A' });
-      const savedOrgA = await typeormOrgRepository.save(orgA);
+          const orgA = createCompanyFixture({ name: 'Organization A' });
+          const savedOrgA = await typeormOrgRepository.save(orgA);
 
-      const orgB = createCompanyFixture({ name: 'Organization B' });
-      const savedOrgB = await typeormOrgRepository.save(orgB);
+          const orgB = createCompanyFixture({ name: 'Organization B' });
+          const savedOrgB = await typeormOrgRepository.save(orgB);
+
+          return { savedUser, savedOrgA, savedOrgB };
+        },
+      );
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
@@ -663,10 +802,13 @@ describe('Role Assignment Integration Tests', () => {
 
     it('removeRoleFromUser should handle global role removal', async () => {
       // Given: User with global role
-      const userFixture = createUserFixture({
-        email: 'removeglobal@test.com',
+      const savedUser = await runAsServiceRole(async () => {
+        const userFixture = createUserFixture({
+          email: 'removeglobal@test.com',
+          supabaseUserId: '00000001-0000-0000-0000-000000000017',
+        });
+        return typeormUserRepository.save(userFixture);
       });
-      const savedUser = await typeormUserRepository.save(userFixture);
 
       await roleRepository.assignRoleToUser({
         userId: savedUser.id,
