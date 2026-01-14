@@ -45,9 +45,7 @@ async function validateRlsEnforcement() {
         console.error(
           '  ⚠️  WARNING: RLS is not blocking unauthenticated queries!',
         );
-        console.error(
-          '  This means RLS policies may not be properly enabled.',
-        );
+        console.error('  This means RLS policies may not be properly enabled.');
       }
     } catch (error) {
       console.log(`  Result: Query failed with error`);
@@ -83,7 +81,9 @@ async function validateRlsEnforcement() {
       allTestsPassed = false;
 
       console.error('  ⚠️  ERROR: Service role context failed!');
-      console.error('  This likely means the service role migration did not run.');
+      console.error(
+        '  This likely means the service role migration did not run.',
+      );
       console.error('  Run: npm run migration:run');
     }
 
@@ -186,9 +186,7 @@ async function validateRlsEnforcement() {
     console.log('─────────────────────────────────────────────────');
     if (allTestsPassed) {
       console.log('✅ All RLS validation tests passed');
-      console.log(
-        '\nRLS policies are properly configured and enforced.',
-      );
+      console.log('\nRLS policies are properly configured and enforced.');
       console.log('Tests can safely use runAsServiceRole() for fixtures.');
       process.exit(0);
     } else {

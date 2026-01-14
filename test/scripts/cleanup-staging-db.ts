@@ -28,7 +28,9 @@ async function cleanupStagingDatabase() {
     // Build TRUNCATE query for all tables at once
     // This handles foreign key constraints automatically with CASCADE
     if (tables.length > 0) {
-      const tableNames = tables.map(({ tablename }) => `"${tablename}"`).join(', ');
+      const tableNames = tables
+        .map(({ tablename }) => `"${tablename}"`)
+        .join(', ');
       console.log(`🧹 Cleaning tables: ${tableNames}`);
       await dataSource.query(
         `TRUNCATE TABLE ${tableNames} RESTART IDENTITY CASCADE;`,

@@ -69,14 +69,11 @@ export const testDataSourceOptions: DataSourceOptions =
 // Singleton DataSource (lazy initialization)
 let _testDataSource: DataSource | null = null;
 
-export const TestDataSource = new Proxy(
-  {} as DataSource,
-  {
-    get(_, prop) {
-      if (!_testDataSource) {
-        _testDataSource = new DataSource(getTestDataSourceOptions());
-      }
-      return _testDataSource[prop as keyof DataSource];
-    },
+export const TestDataSource = new Proxy({} as DataSource, {
+  get(_, prop) {
+    if (!_testDataSource) {
+      _testDataSource = new DataSource(getTestDataSourceOptions());
+    }
+    return _testDataSource[prop as keyof DataSource];
   },
-);
+});

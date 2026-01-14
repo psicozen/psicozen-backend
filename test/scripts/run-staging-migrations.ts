@@ -25,7 +25,10 @@ async function runStagingMigrations() {
       UserRoleSchema,
     ],
     migrations: [
-      resolve(__dirname, '../../src/core/infrastructure/database/migrations/*{.ts,.js}'),
+      resolve(
+        __dirname,
+        '../../src/core/infrastructure/database/migrations/*{.ts,.js}',
+      ),
     ],
     synchronize: false,
     logging: true,
@@ -47,7 +50,7 @@ async function runStagingMigrations() {
         console.log('✅ No new migrations to run - database is up to date');
       } else {
         console.log(`✅ Successfully ran ${migrations.length} migration(s):`);
-        migrations.forEach(migration => {
+        migrations.forEach((migration) => {
           console.log(`   - ${migration.name}`);
         });
       }

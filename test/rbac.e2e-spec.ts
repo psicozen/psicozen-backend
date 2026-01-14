@@ -196,8 +196,12 @@ describe('RBAC Authorization (e2e)', () => {
     const superAdminRole = await roleRepository.findOne({
       where: { name: Role.SUPER_ADMIN },
     });
-    const adminRole = await roleRepository.findOne({ where: { name: Role.ADMIN } });
-    const gestorRole = await roleRepository.findOne({ where: { name: Role.GESTOR } });
+    const adminRole = await roleRepository.findOne({
+      where: { name: Role.ADMIN },
+    });
+    const gestorRole = await roleRepository.findOne({
+      where: { name: Role.GESTOR },
+    });
     const colaboradorRole = await roleRepository.findOne({
       where: { name: Role.COLABORADOR },
     });
@@ -239,7 +243,9 @@ describe('RBAC Authorization (e2e)', () => {
       const transactionManager = getTransactionManager();
 
       if (!transactionManager) {
-        throw new Error('Transaction manager not available in runAsServiceRole context');
+        throw new Error(
+          'Transaction manager not available in runAsServiceRole context',
+        );
       }
 
       const txOrgRepo = transactionManager.getRepository(OrganizationSchema);

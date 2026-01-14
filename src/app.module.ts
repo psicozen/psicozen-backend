@@ -81,8 +81,6 @@ import { AppService } from './app.service';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(RlsMiddleware, OrganizationContextMiddleware)
-      .forRoutes('*');
+    consumer.apply(RlsMiddleware, OrganizationContextMiddleware).forRoutes('*');
   }
 }

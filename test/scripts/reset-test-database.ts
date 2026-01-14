@@ -26,7 +26,9 @@ async function resetTestDatabase() {
     await dataSource.query(`GRANT ALL ON SCHEMA public TO postgres;`);
 
     console.log('✅ All tables and functions dropped');
-    console.log('📦 Database reset complete. Run "npm run test:migrate" to recreate schema.');
+    console.log(
+      '📦 Database reset complete. Run "npm run test:migrate" to recreate schema.',
+    );
   } catch (error) {
     console.error('❌ Failed to reset database:', error);
     throw error;

@@ -26,7 +26,9 @@ export default async (): Promise<void> => {
 
     // Create a new DataSource instance directly for global setup
     const { DataSource } = await import('typeorm');
-    const { getTestDataSourceOptions } = await import('./config/test-datasource');
+    const { getTestDataSourceOptions } = await import(
+      './config/test-datasource'
+    );
 
     const dataSource = new DataSource(getTestDataSourceOptions());
 

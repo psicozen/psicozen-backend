@@ -150,7 +150,9 @@ async function setupTestDatabase() {
     await dataSource.destroy();
 
     console.log('\n🎉 Test database is ready!\n');
-    console.log('You can now run: npm run test:integration or npm run test:e2e');
+    console.log(
+      'You can now run: npm run test:integration or npm run test:e2e',
+    );
   } catch (error) {
     console.error('\n❌ Failed to setup test database:', error);
     process.exit(1);

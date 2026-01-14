@@ -27,8 +27,10 @@ export abstract class TypeOrmBaseRepository<
 
   async findById(id: string): Promise<TDomain | null> {
     const manager = getTransactionManager();
-    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
-    
+    const repo = manager
+      ? manager.getRepository<TEntity>(this.repository.target)
+      : this.repository;
+
     const entity = await repo.findOne({
       where: { id } as FindOptionsWhere<TEntity>,
     });
@@ -37,7 +39,9 @@ export abstract class TypeOrmBaseRepository<
 
   async findAll(options?: FindOptions): Promise<PaginatedResult<TDomain>> {
     const manager = getTransactionManager();
-    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
+    const repo = manager
+      ? manager.getRepository<TEntity>(this.repository.target)
+      : this.repository;
 
     const page = options?.skip
       ? Math.floor(options.skip / (options.take || 10)) + 1
@@ -62,7 +66,9 @@ export abstract class TypeOrmBaseRepository<
 
   async create(domain: Partial<TDomain>): Promise<TDomain> {
     const manager = getTransactionManager();
-    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
+    const repo = manager
+      ? manager.getRepository<TEntity>(this.repository.target)
+      : this.repository;
 
     const entity = this.toEntity(domain);
     const saved = await repo.save(entity);
@@ -71,7 +77,9 @@ export abstract class TypeOrmBaseRepository<
 
   async update(id: string, partial: Partial<TDomain>): Promise<TDomain> {
     const manager = getTransactionManager();
-    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
+    const repo = manager
+      ? manager.getRepository<TEntity>(this.repository.target)
+      : this.repository;
 
     await repo.update(
       id,
@@ -90,13 +98,17 @@ export abstract class TypeOrmBaseRepository<
 
   async delete(id: string): Promise<void> {
     const manager = getTransactionManager();
-    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
+    const repo = manager
+      ? manager.getRepository<TEntity>(this.repository.target)
+      : this.repository;
     await repo.delete(id);
   }
 
   async softDelete(id: string): Promise<void> {
     const manager = getTransactionManager();
-    const repo = manager ? manager.getRepository<TEntity>(this.repository.target) : this.repository;
+    const repo = manager
+      ? manager.getRepository<TEntity>(this.repository.target)
+      : this.repository;
     await repo.softDelete(id);
   }
 }

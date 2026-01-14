@@ -79,10 +79,10 @@ describe('Role Assignment Integration Tests', () => {
 
     // Assign to savedRoles object
     savedRoles = {
-      superAdmin: superAdminRole!,
-      admin: adminRole!,
-      gestor: gestorRole!,
-      colaborador: colaboradorRole!,
+      superAdmin: superAdminRole,
+      admin: adminRole,
+      gestor: gestorRole,
+      colaborador: colaboradorRole,
     };
 
     console.log('✅ Using seed roles:', {

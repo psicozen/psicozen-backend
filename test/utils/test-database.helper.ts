@@ -81,7 +81,7 @@ export async function clearDatabase(): Promise<void> {
     // Wrap entire cleanup in service role context (bypasses RLS for DELETE)
     await runAsServiceRole(async () => {
       // Verify roles exist BEFORE cleanup
-      const rolesBeforeCount = await dataSource!.query(
+      const rolesBeforeCount = await dataSource.query(
         'SELECT COUNT(*) as count FROM roles WHERE is_system_role = true',
       );
 
@@ -100,7 +100,7 @@ export async function clearDatabase(): Promise<void> {
 
       for (const table of testDataTables) {
         // More robust cleanup: exclude service role user and seed data
-        const result = await dataSource!.query(`
+        const result = await dataSource.query(`
           DELETE FROM "${table}"
           WHERE id IS NOT NULL
             AND id != '00000000-0000-0000-0000-000000000000'
@@ -115,7 +115,7 @@ export async function clearDatabase(): Promise<void> {
       }
 
       // Verify roles still exist AFTER cleanup
-      const rolesAfterCount = await dataSource!.query(
+      const rolesAfterCount = await dataSource.query(
         'SELECT COUNT(*) as count FROM roles WHERE is_system_role = true',
       );
 
@@ -126,7 +126,7 @@ export async function clearDatabase(): Promise<void> {
       }
 
       // Verify service role user still exists
-      const serviceUserCount = await dataSource!.query(
+      const serviceUserCount = await dataSource.query(
         `SELECT COUNT(*) as count FROM users WHERE supabase_user_id = '00000000-0000-0000-0000-000000000001'`,
       );
 

@@ -50,7 +50,9 @@ async function setupTestDatabase(): Promise<void> {
       if (executedMigrations.length === 0) {
         console.log('✅ No new migrations to run - database is up to date\n');
       } else {
-        console.log(`✅ Successfully ran ${executedMigrations.length} migration(s):`);
+        console.log(
+          `✅ Successfully ran ${executedMigrations.length} migration(s):`,
+        );
         executedMigrations.forEach((migration) => {
           console.log(`   ✓ ${migration.name}`);
         });
@@ -114,7 +116,9 @@ async function setupTestDatabase(): Promise<void> {
 
       console.log('✅ Service role user created\n');
     } else {
-      console.log(`✅ Service role user exists: ${serviceUserResult[0].email}\n`);
+      console.log(
+        `✅ Service role user exists: ${serviceUserResult[0].email}\n`,
+      );
     }
 
     // 7. Verify RLS policies are enabled
@@ -156,7 +160,9 @@ async function setupTestDatabase(): Promise<void> {
     }
 
     if (tablesWithoutRls.length > 0) {
-      console.log(`\n⚠️  RLS NOT enabled on ${tablesWithoutRls.length} tables:`);
+      console.log(
+        `\n⚠️  RLS NOT enabled on ${tablesWithoutRls.length} tables:`,
+      );
       tablesWithoutRls.forEach((table) => {
         console.log(`   ✗ ${table}`);
       });
