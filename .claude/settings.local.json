@@ -18,6 +18,9 @@
       "Bash(npm test:*)",
       "Bash(perl -i -pe:*)",
       "Bash(perl:*)",
+      "Bash(dir:*)",
+      "Bash(tree:*)",
+      "Bash(npm run format:*)"
       "Bash(npm run test:e2e:*)",
       "Bash(chmod:*)",
       "Bash(bash:*)",
