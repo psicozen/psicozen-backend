@@ -12,22 +12,23 @@ import { resolve } from 'path';
  */
 export default async (): Promise<void> => {
   try {
-    // Load .env.test FIRST (globalSetup runs in separate process)
+    // Try to load .env.test if it exists (for local development)
+    // In CI, environment variables come from GitHub Secrets
     const envTestPath = resolve(__dirname, '../.env.test');
     const result = config({ path: envTestPath });
 
     if (result.error) {
-      console.error('❌ Failed to load .env.test:', result.error);
-      throw result.error;
+      // Don't fail if .env.test doesn't exist - use system env vars (CI)
+      console.log('ℹ️  .env.test not found, using system environment variables (CI mode)');
+    } else {
+      console.log('✅ Environment variables loaded from .env.test (local mode)');
     }
-
-    console.log('✅ Environment variables loaded');
     console.log('🔧 Setting up E2E test environment...');
 
     // Create a new DataSource instance directly for global setup
     const { DataSource } = await import('typeorm');
     const { getTestDataSourceOptions } = await import(
-      './config/test-datasource'
+      './config/test-datasource.js'
     );
 
     const dataSource = new DataSource(getTestDataSourceOptions());
