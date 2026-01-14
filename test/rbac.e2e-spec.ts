@@ -43,6 +43,7 @@ import {
   closeDatabase,
   runAsServiceRole,
 } from './utils/test-database.helper';
+import { resetAllFixtures } from './utils/reset-fixtures.helper';
 
 /**
  * E2E Tests for RBAC (Role-Based Access Control)
@@ -224,17 +225,33 @@ describe('RBAC Authorization (e2e)', () => {
   });
 
   beforeEach(async () => {
+    // Reset fixture counters to prevent conflicts across multiple test runs
+    resetAllFixtures();
     // Clear test data using the helper (preserves seed roles)
     await clearDatabase();
 
     // Then create fixtures in service role context
     const testData = await runAsServiceRole(async () => {
+      // Get repositories from transaction manager to use RLS context
+      const { getTransactionManager } = await import(
+        '../src/core/infrastructure/database/rls.storage'
+      );
+      const transactionManager = getTransactionManager();
+
+      if (!transactionManager) {
+        throw new Error('Transaction manager not available in runAsServiceRole context');
+      }
+
+      const txOrgRepo = transactionManager.getRepository(OrganizationSchema);
+      const txUserRepo = transactionManager.getRepository(UserSchema);
+      const txUserRoleRepo = transactionManager.getRepository(UserRoleSchema);
+
       // Recreate test data
       // Create organizations
       const org1Fixture = createCompanyFixture({ name: 'Organization 1' });
       const org2Fixture = createCompanyFixture({ name: 'Organization 2' });
-      const org1 = await orgRepository.save(org1Fixture);
-      const org2 = await orgRepository.save(org2Fixture);
+      const org1 = await txOrgRepo.save(org1Fixture);
+      const org2 = await txOrgRepo.save(org2Fixture);
 
       // Create users with supabaseUserId
       const superAdminFixture = createUserFixture({
@@ -263,17 +280,17 @@ describe('RBAC Authorization (e2e)', () => {
       });
 
       const users = {
-        superAdmin: await userRepository.save(superAdminFixture),
-        adminOrg1: await userRepository.save(adminOrg1Fixture),
-        gestorOrg1: await userRepository.save(gestorOrg1Fixture),
-        colaboradorOrg1: await userRepository.save(colaboradorOrg1Fixture),
-        adminOrg2: await userRepository.save(adminOrg2Fixture),
-        gestorOrg2: await userRepository.save(gestorOrg2Fixture),
+        superAdmin: await txUserRepo.save(superAdminFixture),
+        adminOrg1: await txUserRepo.save(adminOrg1Fixture),
+        gestorOrg1: await txUserRepo.save(gestorOrg1Fixture),
+        colaboradorOrg1: await txUserRepo.save(colaboradorOrg1Fixture),
+        adminOrg2: await txUserRepo.save(adminOrg2Fixture),
+        gestorOrg2: await txUserRepo.save(gestorOrg2Fixture),
       };
 
       // Assign roles
       // SUPER_ADMIN (global)
-      await userRoleRepository.save({
+      await txUserRoleRepo.save({
         userId: users.superAdmin.id,
         roleId: savedRoles.superAdmin.id,
         organizationId: null,
@@ -281,7 +298,7 @@ describe('RBAC Authorization (e2e)', () => {
       });
 
       // ADMIN in Org 1
-      await userRoleRepository.save({
+      await txUserRoleRepo.save({
         userId: users.adminOrg1.id,
         roleId: savedRoles.admin.id,
         organizationId: org1.id,
@@ -289,7 +306,7 @@ describe('RBAC Authorization (e2e)', () => {
       });
 
       // GESTOR in Org 1
-      await userRoleRepository.save({
+      await txUserRoleRepo.save({
         userId: users.gestorOrg1.id,
         roleId: savedRoles.gestor.id,
         organizationId: org1.id,
@@ -297,7 +314,7 @@ describe('RBAC Authorization (e2e)', () => {
       });
 
       // COLABORADOR in Org 1
-      await userRoleRepository.save({
+      await txUserRoleRepo.save({
         userId: users.colaboradorOrg1.id,
         roleId: savedRoles.colaborador.id,
         organizationId: org1.id,
@@ -305,7 +322,7 @@ describe('RBAC Authorization (e2e)', () => {
       });
 
       // ADMIN in Org 2
-      await userRoleRepository.save({
+      await txUserRoleRepo.save({
         userId: users.adminOrg2.id,
         roleId: savedRoles.admin.id,
         organizationId: org2.id,
@@ -313,7 +330,7 @@ describe('RBAC Authorization (e2e)', () => {
       });
 
       // GESTOR in Org 2
-      await userRoleRepository.save({
+      await txUserRoleRepo.save({
         userId: users.gestorOrg2.id,
         roleId: savedRoles.gestor.id,
         organizationId: org2.id,

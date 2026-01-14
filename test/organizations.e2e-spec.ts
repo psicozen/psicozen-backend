@@ -29,6 +29,7 @@ import {
   closeDatabase,
   runAsServiceRole,
 } from './utils/test-database.helper';
+import { resetAllFixtures } from './utils/reset-fixtures.helper';
 
 /**
  * E2E Tests for Organizations Module
@@ -195,6 +196,8 @@ describe('OrganizationsController (e2e)', () => {
   });
 
   beforeEach(async () => {
+    // Reset fixture counters to prevent conflicts across multiple test runs
+    resetAllFixtures();
     // Clean up all tables before each test
     await clearDatabase();
     // Reset to SUPER_ADMIN for each test

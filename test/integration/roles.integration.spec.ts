@@ -16,6 +16,7 @@ import {
   ensureSeedRolesExist,
   runAsServiceRole,
 } from '../utils/test-database.helper';
+import { resetAllFixtures } from '../utils/reset-fixtures.helper';
 import {
   createUserFixture,
   createUsersForRoleTesting,
@@ -93,6 +94,8 @@ describe('Role Assignment Integration Tests', () => {
   });
 
   afterEach(async () => {
+    // Reset fixture counters to prevent conflicts across multiple test runs
+    resetAllFixtures();
     // Clear test data using proper cleanup function
     // This preserves seed data (roles, permissions) while clearing user_roles, users, organizations
     await clearDatabase();
@@ -120,11 +123,13 @@ describe('Role Assignment Integration Tests', () => {
       });
 
       // When: Assign ADMIN to user in Org A
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
+      await runAsServiceRole(async () => {
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.admin.id,
+          organizationId: savedOrgA.id,
+          assignedBy: savedUser.id,
+        });
       });
 
       // Then: User has ADMIN in Org A
@@ -173,19 +178,21 @@ describe('Role Assignment Integration Tests', () => {
       );
 
       // Assign ADMIN in Org A
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
-      });
+      await runAsServiceRole(async () => {
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.admin.id,
+          organizationId: savedOrgA.id,
+          assignedBy: savedUser.id,
+        });
 
-      // When: Assign GESTOR to user in Org B
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.gestor.id,
-        organizationId: savedOrgB.id,
-        assignedBy: savedUser.id,
+        // When: Assign GESTOR to user in Org B
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.gestor.id,
+          organizationId: savedOrgB.id,
+          assignedBy: savedUser.id,
+        });
       });
 
       // Then: User has ADMIN in Org A (unchanged)
@@ -207,6 +214,8 @@ describe('Role Assignment Integration Tests', () => {
 
     it('should allow different roles in different organizations', async () => {
       // Given: User with ADMIN in Org A and GESTOR in Org B
+      // CRITICAL: All operations MUST be in the SAME runAsServiceRole block
+      // to share the same transaction context (prevents FK constraint errors)
       const { savedUser, savedOrgA, savedOrgB } = await runAsServiceRole(
         async () => {
           const userFixture = createUserFixture({
@@ -221,23 +230,24 @@ describe('Role Assignment Integration Tests', () => {
           const orgB = createCompanyFixture({ name: 'Company B' });
           const savedOrgB = await typeormOrgRepository.save(orgB);
 
+          // Assign roles in the SAME transaction
+          await roleRepository.assignRoleToUser({
+            userId: savedUser.id,
+            roleId: savedRoles.admin.id,
+            organizationId: savedOrgA.id,
+            assignedBy: savedUser.id,
+          });
+
+          await roleRepository.assignRoleToUser({
+            userId: savedUser.id,
+            roleId: savedRoles.gestor.id,
+            organizationId: savedOrgB.id,
+            assignedBy: savedUser.id,
+          });
+
           return { savedUser, savedOrgA, savedOrgB };
         },
       );
-
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
-      });
-
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.gestor.id,
-        organizationId: savedOrgB.id,
-        assignedBy: savedUser.id,
-      });
 
       // When: Query roles by organization
       const rolesInOrgA = await userRepository.getRolesByOrganization(
@@ -269,19 +279,21 @@ describe('Role Assignment Integration Tests', () => {
         return { savedUser, savedOrgA };
       });
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
-      });
+      await runAsServiceRole(async () => {
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.admin.id,
+          organizationId: savedOrgA.id,
+          assignedBy: savedUser.id,
+        });
 
-      // When: Assign GESTOR to same user in same Org A
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.gestor.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
+        // When: Assign GESTOR to same user in same Org A
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.gestor.id,
+          organizationId: savedOrgA.id,
+          assignedBy: savedUser.id,
+        });
       });
 
       // Then: User has both ADMIN and GESTOR in Org A
@@ -307,11 +319,13 @@ describe('Role Assignment Integration Tests', () => {
       });
 
       // When: Assign SUPER_ADMIN without organizationId (global)
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.superAdmin.id,
-        organizationId: null,
-        assignedBy: savedUser.id,
+      await runAsServiceRole(async () => {
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.superAdmin.id,
+          organizationId: null,
+          assignedBy: savedUser.id,
+        });
       });
 
       // Then: User has SUPER_ADMIN globally
@@ -332,6 +346,7 @@ describe('Role Assignment Integration Tests', () => {
 
     it('should include SUPER_ADMIN in any organization query', async () => {
       // Given: User with SUPER_ADMIN globally
+      // CRITICAL: All operations MUST be in the SAME runAsServiceRole block
       const { savedUser, savedOrgA } = await runAsServiceRole(async () => {
         const userFixture = createUserFixture({
           email: 'globaladmin@test.com',
@@ -342,14 +357,15 @@ describe('Role Assignment Integration Tests', () => {
         const orgA = createCompanyFixture({ name: 'Organization A' });
         const savedOrgA = await typeormOrgRepository.save(orgA);
 
-        return { savedUser, savedOrgA };
-      });
+        // Assign role in the SAME transaction
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.superAdmin.id,
+          organizationId: null,
+          assignedBy: savedUser.id,
+        });
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.superAdmin.id,
-        organizationId: null,
-        assignedBy: savedUser.id,
+        return { savedUser, savedOrgA };
       });
 
       // When: Query roles for specific organization
@@ -377,19 +393,21 @@ describe('Role Assignment Integration Tests', () => {
         return { savedUser, savedOrgA };
       });
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.superAdmin.id,
-        organizationId: null,
-        assignedBy: savedUser.id,
-      });
+      await runAsServiceRole(async () => {
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.superAdmin.id,
+          organizationId: null,
+          assignedBy: savedUser.id,
+        });
 
-      // When: Assign ADMIN in Org A
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
+        // When: Assign ADMIN in Org A
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.admin.id,
+          organizationId: savedOrgA.id,
+          assignedBy: savedUser.id,
+        });
       });
 
       // Then: User has both roles in Org A context
@@ -426,50 +444,60 @@ describe('Role Assignment Integration Tests', () => {
         return { savedUser, savedOrgA };
       });
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
+      await runAsServiceRole(async () => {
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.admin.id,
+          organizationId: savedOrgA.id,
+          assignedBy: savedUser.id,
+        });
       });
 
       // When: Try to assign ADMIN again in same Org A
       // Then: Should throw ConflictException
       await expect(
-        roleRepository.assignRoleToUser({
-          userId: savedUser.id,
-          roleId: savedRoles.admin.id,
-          organizationId: savedOrgA.id,
-          assignedBy: savedUser.id,
+        runAsServiceRole(async () => {
+          return roleRepository.assignRoleToUser({
+            userId: savedUser.id,
+            roleId: savedRoles.admin.id,
+            organizationId: savedOrgA.id,
+            assignedBy: savedUser.id,
+          });
         }),
       ).rejects.toThrow(ConflictException);
     });
 
     it('should prevent duplicate global role assignment', async () => {
       // Given: User already has SUPER_ADMIN globally
+      // CRITICAL: All setup operations MUST be in the SAME runAsServiceRole block
       const savedUser = await runAsServiceRole(async () => {
         const userFixture = createUserFixture({
           email: 'duplicateglobal@test.com',
           supabaseUserId: '00000001-0000-0000-0000-000000000009',
         });
-        return typeormUserRepository.save(userFixture);
-      });
+        const savedUser = await typeormUserRepository.save(userFixture);
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.superAdmin.id,
-        organizationId: null,
-        assignedBy: savedUser.id,
-      });
-
-      // When: Try to assign SUPER_ADMIN again globally
-      // Then: Should throw ConflictException
-      await expect(
-        roleRepository.assignRoleToUser({
+        // Assign initial role in the SAME transaction
+        await roleRepository.assignRoleToUser({
           userId: savedUser.id,
           roleId: savedRoles.superAdmin.id,
           organizationId: null,
           assignedBy: savedUser.id,
+        });
+
+        return savedUser;
+      });
+
+      // When: Try to assign SUPER_ADMIN again globally (in new transaction)
+      // Then: Should throw ConflictException
+      await expect(
+        runAsServiceRole(async () => {
+          return roleRepository.assignRoleToUser({
+            userId: savedUser.id,
+            roleId: savedRoles.superAdmin.id,
+            organizationId: null,
+            assignedBy: savedUser.id,
+          });
         }),
       ).rejects.toThrow(ConflictException);
     });
@@ -494,21 +522,25 @@ describe('Role Assignment Integration Tests', () => {
         },
       );
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
+      await runAsServiceRole(async () => {
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.admin.id,
+          organizationId: savedOrgA.id,
+          assignedBy: savedUser.id,
+        });
       });
 
       // When: Assign same ADMIN role in Org B
       // Then: Should succeed (different organizations)
       await expect(
-        roleRepository.assignRoleToUser({
-          userId: savedUser.id,
-          roleId: savedRoles.admin.id,
-          organizationId: savedOrgB.id,
-          assignedBy: savedUser.id,
+        runAsServiceRole(async () => {
+          return roleRepository.assignRoleToUser({
+            userId: savedUser.id,
+            roleId: savedRoles.admin.id,
+            organizationId: savedOrgB.id,
+            assignedBy: savedUser.id,
+          });
         }),
       ).resolves.not.toThrow();
 
@@ -568,6 +600,7 @@ describe('Role Assignment Integration Tests', () => {
 
     it('should cascade delete user_roles when organization is deleted', async () => {
       // Given: User with role in organization
+      // CRITICAL: All operations MUST be in the SAME runAsServiceRole block
       const { savedUser, savedOrgA } = await runAsServiceRole(async () => {
         const userFixture = createUserFixture({
           email: 'cascade@test.com',
@@ -578,14 +611,15 @@ describe('Role Assignment Integration Tests', () => {
         const orgA = createCompanyFixture({ name: 'Organization To Delete' });
         const savedOrgA = await typeormOrgRepository.save(orgA);
 
-        return { savedUser, savedOrgA };
-      });
+        // Assign role in the SAME transaction
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.admin.id,
+          organizationId: savedOrgA.id,
+          assignedBy: savedUser.id,
+        });
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
+        return { savedUser, savedOrgA };
       });
 
       // Verify assignment exists
@@ -630,18 +664,20 @@ describe('Role Assignment Integration Tests', () => {
       });
 
       // When: Assign same role with NULL and with organization
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: null,
-        assignedBy: savedUser.id,
-      });
+      await runAsServiceRole(async () => {
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.admin.id,
+          organizationId: null,
+          assignedBy: savedUser.id,
+        });
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.admin.id,
+          organizationId: savedOrgA.id,
+          assignedBy: savedUser.id,
+        });
       });
 
       // Then: Both assignments should coexist (NULL is distinct in unique index)
@@ -688,47 +724,57 @@ describe('Role Assignment Integration Tests', () => {
         },
       );
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.gestor.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
+      await runAsServiceRole(async () => {
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.gestor.id,
+          organizationId: savedOrgA.id,
+          assignedBy: savedUser.id,
+        });
       });
 
-      // When: Check if user has role in organization
-      const hasRole = await roleRepository.userHasRoleInOrganization(
-        savedUser.id,
-        savedRoles.gestor.id,
-        savedOrgA.id,
-      );
+      // When: Check if user has role in organization (wrap in service role to bypass RLS)
+      const hasRole = await runAsServiceRole(async () => {
+        return roleRepository.userHasRoleInOrganization(
+          savedUser.id,
+          savedRoles.gestor.id,
+          savedOrgA.id,
+        );
+      });
 
       // Then: Should return true
       expect(hasRole).toBe(true);
 
       // Should return false for different organization
-      const hasRoleInOrgB = await roleRepository.userHasRoleInOrganization(
-        savedUser.id,
-        savedRoles.gestor.id,
-        savedOrgB.id,
-      );
+      const hasRoleInOrgB = await runAsServiceRole(async () => {
+        return roleRepository.userHasRoleInOrganization(
+          savedUser.id,
+          savedRoles.gestor.id,
+          savedOrgB.id,
+        );
+      });
       expect(hasRoleInOrgB).toBe(false);
     });
 
     it('userHasRoleInOrganization should work for global roles', async () => {
       // Given: User with global role
+      // CRITICAL: All operations MUST be in the SAME runAsServiceRole block
       const savedUser = await runAsServiceRole(async () => {
         const userFixture = createUserFixture({
           email: 'globalmethod@test.com',
           supabaseUserId: '00000001-0000-0000-0000-000000000015',
         });
-        return typeormUserRepository.save(userFixture);
-      });
+        const savedUser = await typeormUserRepository.save(userFixture);
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.superAdmin.id,
-        organizationId: null,
-        assignedBy: savedUser.id,
+        // Assign role in the SAME transaction
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.superAdmin.id,
+          organizationId: null,
+          assignedBy: savedUser.id,
+        });
+
+        return savedUser;
       });
 
       // When: Check if user has global role
@@ -762,18 +808,20 @@ describe('Role Assignment Integration Tests', () => {
         },
       );
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: savedOrgA.id,
-        assignedBy: savedUser.id,
-      });
+      await runAsServiceRole(async () => {
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.admin.id,
+          organizationId: savedOrgA.id,
+          assignedBy: savedUser.id,
+        });
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.admin.id,
-        organizationId: savedOrgB.id,
-        assignedBy: savedUser.id,
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.admin.id,
+          organizationId: savedOrgB.id,
+          assignedBy: savedUser.id,
+        });
       });
 
       // When: Remove role from Org A only
@@ -810,11 +858,13 @@ describe('Role Assignment Integration Tests', () => {
         return typeormUserRepository.save(userFixture);
       });
 
-      await roleRepository.assignRoleToUser({
-        userId: savedUser.id,
-        roleId: savedRoles.superAdmin.id,
-        organizationId: null,
-        assignedBy: savedUser.id,
+      await runAsServiceRole(async () => {
+        await roleRepository.assignRoleToUser({
+          userId: savedUser.id,
+          roleId: savedRoles.superAdmin.id,
+          organizationId: null,
+          assignedBy: savedUser.id,
+        });
       });
 
       // Verify role exists

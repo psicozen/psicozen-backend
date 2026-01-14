@@ -8,7 +8,7 @@ let dataSource: DataSource | null = null;
  * Initialize PostgreSQL Test Database (Render Staging)
  *
  * - Connects to PostgreSQL staging database on Render
- * - Runs all migrations to ensure schema is up-to-date
+ * - AUTOMATICALLY runs pending migrations to ensure schema is up-to-date
  * - Handles RLS policies and foreign key constraints
  * - Singleton pattern to avoid multiple connections
  */
@@ -25,14 +25,33 @@ export async function initializeTestDatabase(): Promise<DataSource> {
     await dataSource.initialize();
     console.log('✅ Test database connected (Render Staging)');
 
-    // NOTE: Migrations should be run manually using: npm run test:migrate
-    // This avoids conflicts when running multiple test suites sequentially
+    // AUTO-RUN MIGRATIONS: Ensure schema is always up-to-date
+    const pendingMigrations = await dataSource.showMigrations();
+    if (pendingMigrations) {
+      console.log('📦 Running pending migrations...');
+      const executedMigrations = await dataSource.runMigrations({
+        transaction: 'all',
+      });
+
+      if (executedMigrations.length > 0) {
+        console.log(
+          `✅ Ran ${executedMigrations.length} migration(s) successfully`,
+        );
+      }
+    }
 
     // Verify database state
     const rolesCount = await dataSource.query(
       'SELECT COUNT(*) as count FROM roles',
     );
     console.log(`📊 Seed roles in database: ${rolesCount[0].count}`);
+
+    // Ensure critical roles exist
+    if (rolesCount[0].count === 0) {
+      throw new Error(
+        '❌ Database not seeded! Migrations may have failed. Run: npm run test:setup-db',
+      );
+    }
 
     return dataSource;
   } catch (error) {
@@ -50,6 +69,7 @@ export async function initializeTestDatabase(): Promise<DataSource> {
  * - IMPORTANT: Does NOT delete seed/fixture data (roles, permissions, role_permissions)
  * - Uses DELETE instead of TRUNCATE to avoid CASCADE issues with seed data
  * - Runs in service role context to bypass RLS policies during cleanup
+ * - Idempotent: Safe to run multiple times without errors
  */
 export async function clearDatabase(): Promise<void> {
   if (!dataSource?.isInitialized) {
@@ -76,17 +96,21 @@ export async function clearDatabase(): Promise<void> {
       ];
 
       let deletedCount = 0;
+      let totalRowsDeleted = 0;
 
       for (const table of testDataTables) {
+        // More robust cleanup: exclude service role user and seed data
         const result = await dataSource!.query(`
           DELETE FROM "${table}"
           WHERE id IS NOT NULL
-            AND id != '00000000-0000-0000-0000-000000000000';
+            AND id != '00000000-0000-0000-0000-000000000000'
+            ${table === 'users' ? "AND supabase_user_id != '00000000-0000-0000-0000-000000000001'" : ''};
         `);
 
-        if (result[1] > 0) {
-          // result[1] contains affected rows count
+        const rowsDeleted = result[1] || 0;
+        if (rowsDeleted > 0) {
           deletedCount++;
+          totalRowsDeleted += rowsDeleted;
         }
       }
 
@@ -101,7 +125,20 @@ export async function clearDatabase(): Promise<void> {
         );
       }
 
-      console.log(`🧹 Cleared ${deletedCount} test data tables`);
+      // Verify service role user still exists
+      const serviceUserCount = await dataSource!.query(
+        `SELECT COUNT(*) as count FROM users WHERE supabase_user_id = '00000000-0000-0000-0000-000000000001'`,
+      );
+
+      if (serviceUserCount[0].count === 0) {
+        throw new Error(
+          '❌ CRITICAL: Service role user was deleted during cleanup!',
+        );
+      }
+
+      console.log(
+        `🧹 Cleared ${deletedCount} test data tables (${totalRowsDeleted} rows)`,
+      );
     });
   } catch (error) {
     console.error('❌ Failed to clear database:', error);
