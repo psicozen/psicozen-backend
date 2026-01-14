@@ -67,7 +67,7 @@ describe('EmociogramaSubmissionRepository', () => {
   });
 
   // Mock QueryBuilder - retorna como 'any' para evitar problemas de tipo com TypeORM
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const createMockQueryBuilder = (): any => {
     const mockQb: MockQueryBuilder = {
       where: jest.fn().mockReturnThis(),
@@ -225,7 +225,6 @@ describe('EmociogramaSubmissionRepository', () => {
       expect(schema.department).toBeUndefined();
       expect(schema.team).toBeUndefined();
     });
-
 
     it('should only set properties that are defined', () => {
       const domain: Partial<EmociogramaSubmissionEntity> = {

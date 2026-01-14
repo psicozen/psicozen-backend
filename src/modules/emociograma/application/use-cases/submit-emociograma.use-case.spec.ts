@@ -79,8 +79,6 @@ describe('SubmitEmociogramaUseCase', () => {
       getByTeam: jest.fn(),
       deleteByUser: jest.fn(),
       anonymizeByUser: jest.fn(),
-      countAboveThreshold: jest.fn(),
-      findFlaggedComments: jest.fn(),
     };
 
     const mockOrganizationRepository: Partial<
