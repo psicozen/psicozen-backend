@@ -8,10 +8,10 @@ import {
 } from 'typeorm';
 
 /**
- * TypeORM Schema - Emociograma Category
+ * Schema TypeORM para a tabela emociograma_categories
  *
- * Maps to the `emociograma_categories` table.
- * Lookup table with 10 predefined emotion categories.
+ * Representa as categorias predefinidas de emoções que os usuários
+ * podem selecionar ao submeter seu estado emocional.
  */
 @Entity('emociograma_categories')
 @Index(['slug'], { unique: true })

@@ -14,14 +14,10 @@ import { UserSchema } from '../../../users/infrastructure/persistence/user.schem
 import { EmociogramaCategorySchema } from './category.schema';
 
 /**
- * TypeORM Schema - Emociograma Submission
+ * Schema TypeORM para a tabela emociograma_submissions
  *
- * Maps to the `emociograma_submissions` table.
- * Stores individual emotional state submissions from users.
- *
- * Emotion Scale:
- * - 1-5: Positive emotions (very happy to neutral)
- * - 6-10: Negative emotions (tired to very sad) - triggers alert
+ * Representa uma submissão individual de estado emocional por um colaborador.
+ * Suporta anonimato opcional e moderação de comentários.
  */
 @Entity('emociograma_submissions')
 @Index('idx_emociograma_org_user', ['organizationId', 'userId'])
@@ -78,11 +74,10 @@ export class EmociogramaSubmissionSchema {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @DeleteDateColumn({ name: 'deleted_at' })
+  @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   deletedAt: Date | null;
 
-  // Relationships
-
+  // Relações
   @ManyToOne(() => OrganizationSchema, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'organization_id' })
   organization: OrganizationSchema;
@@ -91,7 +86,7 @@ export class EmociogramaSubmissionSchema {
   @JoinColumn({ name: 'user_id' })
   user: UserSchema;
 
-  @ManyToOne(() => EmociogramaCategorySchema, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => EmociogramaCategorySchema)
   @JoinColumn({ name: 'category_id' })
   category: EmociogramaCategorySchema;
 }
