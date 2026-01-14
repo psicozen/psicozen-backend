@@ -46,6 +46,7 @@ describe('RolesGuard', () => {
       findByEmail: jest.fn(),
       findBySupabaseUserId: jest.fn(),
       existsByEmail: jest.fn(),
+      findByRoles: jest.fn(),
       findAll: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
