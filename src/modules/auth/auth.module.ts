@@ -43,6 +43,6 @@ import { UsersModule } from '../users/users.module';
     SyncUserWithSupabaseUseCase,
     LogoutUseCase,
   ],
-  exports: [SupabaseAuthGuard, AUTH_SERVICE],
+  exports: [SupabaseAuthGuard, AUTH_SERVICE, SyncUserWithSupabaseUseCase],
 })
 export class AuthModule {}
