@@ -2,7 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 
 // Configuration
 import { validationSchema } from './config/env.validation';
@@ -14,6 +14,7 @@ import { AllExceptionsFilter } from './core/presentation/filters/http-exception.
 
 // Feature Modules
 import { AuthModule } from './modules/auth/auth.module';
+import { SupabaseAuthGuard } from './modules/auth/presentation/guards/supabase-auth.guard';
 import { UsersModule } from './modules/users/users.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { FilesModule } from './modules/files/files.module';
@@ -71,7 +72,11 @@ import { AppService } from './app.service';
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,
     },
-    // Note: Global SupabaseAuthGuard is registered in AuthModule
+    // Global Auth Guard - registered here after AuthModule is fully initialized
+    {
+      provide: APP_GUARD,
+      useClass: SupabaseAuthGuard,
+    },
   ],
 })
 export class AppModule implements NestModule {

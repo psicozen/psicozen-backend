@@ -17,7 +17,6 @@ import { Throttle } from '@nestjs/throttler';
 import { UserEntity } from '../../../users/domain/entities/user.entity';
 import { Public } from '../../../../core/presentation/decorators/public.decorator';
 import { CurrentUser } from '../../../../core/presentation/decorators/current-user.decorator';
-import { SupabaseAuthGuard } from '../guards/supabase-auth.guard';
 import { MagicLinkThrottleGuard } from '../guards/magic-link-throttle.guard';
 import { SendMagicLinkUseCase } from '../../application/use-cases/send-magic-link.use-case';
 import { LogoutUseCase } from '../../application/use-cases/logout.use-case';
@@ -45,7 +44,6 @@ export class AuthController {
     return { success: true, data: result };
   }
 
-  @UseGuards(SupabaseAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
@@ -57,7 +55,6 @@ export class AuthController {
     return { success: true, data: result };
   }
 
-  @UseGuards(SupabaseAuthGuard)
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current authenticated user profile' })
