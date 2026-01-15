@@ -18,7 +18,8 @@
       "Bash(npm test:*)",
       "Bash(perl -i -pe:*)",
       "Bash(perl:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(findstr:*)"
     ]
   }
 }
