@@ -1,67 +1,45 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
-import { IS_PUBLIC_KEY } from '../../../../core/presentation/decorators/public.decorator';
-import { USER_REPOSITORY } from '../../../users/domain/repositories/user.repository.interface';
+import type { IAuthService } from '../../domain/services/auth.service.interface';
+import { AUTH_SERVICE } from '../../domain/services/auth.service.interface';
+import { SyncUserWithSupabaseUseCase } from '../../application/use-cases/sync-user-with-supabase.use-case';
 import { UserEntity } from '../../../users/domain/entities/user.entity';
-
-// Mock Supabase client
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(() => ({
-    auth: {
-      getUser: jest.fn(),
-    },
-  })),
-}));
 
 describe('SupabaseAuthGuard', () => {
   let guard: SupabaseAuthGuard;
   let reflector: jest.Mocked<Reflector>;
-  let userRepository: any;
-  let mockSupabaseClient: any;
+  let authService: jest.Mocked<IAuthService>;
+  let syncUserUseCase: jest.Mocked<SyncUserWithSupabaseUseCase>;
 
   const mockUser = UserEntity.create(
     'test@example.com',
     'supabase-user-123',
     'John',
   );
-  mockUser.id = 'user-uuid-123';
+  (mockUser as any).id = 'user-uuid-123';
+
+  const mockAuthenticatedUser = {
+    id: 'supabase-user-123',
+    email: 'test@example.com',
+    firstName: 'John',
+    metadata: {},
+  };
 
   beforeEach(async () => {
-    jest.resetModules();
-    jest.clearAllMocks();
-
-    // Setup fresh mock
-    jest.doMock('@supabase/supabase-js', () => ({
-      createClient: jest.fn(() => ({
-        auth: {
-          getUser: jest.fn(),
-        },
-      })),
-    }));
-
-    const { createClient } = require('@supabase/supabase-js');
-    mockSupabaseClient = createClient();
-
     const mockReflector = {
       getAllAndOverride: jest.fn(),
     };
 
-    const mockConfigService = {
-      get: jest.fn((key: string) => {
-        if (key === 'SUPABASE_URL') return 'https://test.supabase.co';
-        if (key === 'SUPABASE_PUBLISHABLE_KEY') return 'test-key';
-        return null;
-      }),
+    const mockAuthService: jest.Mocked<IAuthService> = {
+      validateToken: jest.fn(),
+      signOut: jest.fn(),
     };
 
-    const mockUserRepository = {
-      findBySupabaseUserId: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-    };
+    const mockSyncUserUseCase = {
+      execute: jest.fn(),
+    } as any;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -71,22 +49,20 @@ describe('SupabaseAuthGuard', () => {
           useValue: mockReflector,
         },
         {
-          provide: ConfigService,
-          useValue: mockConfigService,
+          provide: AUTH_SERVICE,
+          useValue: mockAuthService,
         },
         {
-          provide: USER_REPOSITORY,
-          useValue: mockUserRepository,
+          provide: SyncUserWithSupabaseUseCase,
+          useValue: mockSyncUserUseCase,
         },
       ],
     }).compile();
 
     guard = module.get<SupabaseAuthGuard>(SupabaseAuthGuard);
     reflector = module.get(Reflector);
-    userRepository = module.get(USER_REPOSITORY);
-
-    // Get the supabase client instance from guard
-    (guard as any).supabase = mockSupabaseClient;
+    authService = module.get(AUTH_SERVICE);
+    syncUserUseCase = module.get(SyncUserWithSupabaseUseCase);
   });
 
   afterEach(() => {
@@ -123,36 +99,38 @@ describe('SupabaseAuthGuard', () => {
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
-        expect(mockSupabaseClient.auth.getUser).not.toHaveBeenCalled();
+        expect(authService.validateToken).not.toHaveBeenCalled();
+        expect(syncUserUseCase.execute).not.toHaveBeenCalled();
       });
     });
 
     describe('when route is protected and token is valid', () => {
       beforeEach(() => {
         reflector.getAllAndOverride.mockReturnValue(false);
-        mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: {
-            user: {
-              id: 'supabase-user-123',
-              email: 'test@example.com',
-              user_metadata: { first_name: 'John' },
-            },
-          },
-          error: null,
-        });
-        userRepository.findBySupabaseUserId.mockResolvedValue(mockUser);
-        userRepository.update.mockResolvedValue(mockUser);
+        authService.validateToken.mockResolvedValue(mockAuthenticatedUser);
+        syncUserUseCase.execute.mockResolvedValue(mockUser);
       });
 
-      it('should validate token and attach user to request', async () => {
+      it('should validate token using auth service', async () => {
+        await guard.canActivate(mockExecutionContext);
+
+        expect(authService.validateToken).toHaveBeenCalledWith('valid-token');
+      });
+
+      it('should sync user using use case', async () => {
+        await guard.canActivate(mockExecutionContext);
+
+        expect(syncUserUseCase.execute).toHaveBeenCalledWith(
+          mockAuthenticatedUser,
+        );
+      });
+
+      it('should attach user to request', async () => {
         const request = mockExecutionContext.switchToHttp().getRequest();
 
         const result = await guard.canActivate(mockExecutionContext);
 
         expect(result).toBe(true);
-        expect(mockSupabaseClient.auth.getUser).toHaveBeenCalledWith(
-          'valid-token',
-        );
         expect(request.user).toEqual({
           id: mockUser.id,
           email: mockUser.email,
@@ -172,78 +150,77 @@ describe('SupabaseAuthGuard', () => {
             headers: {},
           });
 
-        await expect(
-          guard.canActivate(mockExecutionContext),
-        ).rejects.toThrow(UnauthorizedException);
-        await expect(
-          guard.canActivate(mockExecutionContext),
-        ).rejects.toThrow('No authentication token provided');
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          'No authentication token provided',
+        );
       });
     });
 
     describe('when token is invalid', () => {
       it('should throw UnauthorizedException', async () => {
         reflector.getAllAndOverride.mockReturnValue(false);
-        mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: null },
-          error: { message: 'Invalid token' },
-        });
+        authService.validateToken.mockResolvedValue(null);
 
-        await expect(
-          guard.canActivate(mockExecutionContext),
-        ).rejects.toThrow(UnauthorizedException);
-        await expect(
-          guard.canActivate(mockExecutionContext),
-        ).rejects.toThrow('Invalid or expired token');
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          'Invalid or expired token',
+        );
       });
     });
 
     describe('when user account is disabled', () => {
       it('should throw UnauthorizedException', async () => {
         reflector.getAllAndOverride.mockReturnValue(false);
-        mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: {
-            user: {
-              id: 'supabase-user-123',
-              email: 'test@example.com',
-            },
-          },
-          error: null,
-        });
+        authService.validateToken.mockResolvedValue(mockAuthenticatedUser);
 
-        const inactiveUser = new UserEntity({ ...mockUser, isActive: false });
-        userRepository.findBySupabaseUserId.mockResolvedValue(inactiveUser);
+        const inactiveUser = UserEntity.create(
+          'test@example.com',
+          'supabase-user-123',
+          'John',
+        );
+        (inactiveUser as any).isActive = false;
 
-        await expect(
-          guard.canActivate(mockExecutionContext),
-        ).rejects.toThrow(UnauthorizedException);
-        await expect(
-          guard.canActivate(mockExecutionContext),
-        ).rejects.toThrow('User account is disabled');
+        syncUserUseCase.execute.mockResolvedValue(inactiveUser);
+
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          'User account is disabled',
+        );
       });
     });
 
-    describe('when user does not exist locally', () => {
-      it('should create user automatically', async () => {
+    describe('error handling', () => {
+      it('should wrap generic errors in UnauthorizedException', async () => {
         reflector.getAllAndOverride.mockReturnValue(false);
-        mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: {
-            user: {
-              id: 'new-supabase-user',
-              email: 'newuser@example.com',
-              user_metadata: { first_name: 'New' },
-            },
-          },
-          error: null,
-        });
+        authService.validateToken.mockRejectedValue(new Error('Generic error'));
 
-        userRepository.findBySupabaseUserId.mockResolvedValue(null);
-        userRepository.create.mockResolvedValue(mockUser);
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          'Authentication failed',
+        );
+      });
 
-        const result = await guard.canActivate(mockExecutionContext);
+      it('should preserve UnauthorizedException errors', async () => {
+        reflector.getAllAndOverride.mockReturnValue(false);
+        authService.validateToken.mockRejectedValue(
+          new UnauthorizedException('Specific error'),
+        );
 
-        expect(result).toBe(true);
-        expect(userRepository.create).toHaveBeenCalled();
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          'Specific error',
+        );
       });
     });
   });

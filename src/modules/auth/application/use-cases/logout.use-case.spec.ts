@@ -1,28 +1,30 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LogoutUseCase } from './logout.use-case';
-import { SupabaseService } from '../../../../core/infrastructure/supabase/supabase.service';
+import type { IAuthService } from '../../domain/services/auth.service.interface';
+import { AUTH_SERVICE } from '../../domain/services/auth.service.interface';
 
 describe('LogoutUseCase', () => {
   let useCase: LogoutUseCase;
-  let supabaseService: jest.Mocked<SupabaseService>;
+  let authService: jest.Mocked<IAuthService>;
 
   beforeEach(async () => {
-    const mockSupabaseService = {
+    const mockAuthService: jest.Mocked<IAuthService> = {
       signOut: jest.fn(),
+      validateToken: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LogoutUseCase,
         {
-          provide: SupabaseService,
-          useValue: mockSupabaseService,
+          provide: AUTH_SERVICE,
+          useValue: mockAuthService,
         },
       ],
     }).compile();
 
     useCase = module.get<LogoutUseCase>(LogoutUseCase);
-    supabaseService = module.get(SupabaseService);
+    authService = module.get(AUTH_SERVICE);
   });
 
   it('should be defined', () => {
@@ -30,26 +32,26 @@ describe('LogoutUseCase', () => {
   });
 
   describe('execute', () => {
-    it('should sign out from Supabase successfully', async () => {
+    it('should sign out successfully using auth service', async () => {
       const supabaseUserId = 'supabase-user-123';
 
-      supabaseService.signOut.mockResolvedValue(undefined);
+      authService.signOut.mockResolvedValue(undefined);
 
       const result = await useCase.execute(supabaseUserId);
 
       expect(result.message).toBe('Logged out successfully');
-      expect(supabaseService.signOut).toHaveBeenCalledTimes(1);
+      expect(authService.signOut).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle Supabase errors gracefully', async () => {
+    it('should handle auth service errors gracefully', async () => {
       const supabaseUserId = 'supabase-user-123';
 
-      supabaseService.signOut.mockRejectedValue(
-        new Error('Supabase signOut error'),
+      authService.signOut.mockRejectedValue(
+        new Error('Auth service signOut error'),
       );
 
       await expect(useCase.execute(supabaseUserId)).rejects.toThrow(
-        'Supabase signOut error',
+        'Auth service signOut error',
       );
     });
   });

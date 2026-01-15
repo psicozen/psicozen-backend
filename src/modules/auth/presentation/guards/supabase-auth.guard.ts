@@ -4,43 +4,41 @@ import {
   UnauthorizedException,
   Inject,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { IS_PUBLIC_KEY } from '../../../../core/presentation/decorators/public.decorator';
-import type { IUserRepository } from '../../../users/domain/repositories/user.repository.interface';
-import { USER_REPOSITORY } from '../../../users/domain/repositories/user.repository.interface';
-import { UserEntity } from '../../../users/domain/entities/user.entity';
+import type { IAuthService } from '../../domain/services/auth.service.interface';
+import { AUTH_SERVICE } from '../../domain/services/auth.service.interface';
+import { SyncUserWithSupabaseUseCase } from '../../application/use-cases/sync-user-with-supabase.use-case';
 
+/**
+ * SupabaseAuthGuard
+ *
+ * Guard global de autenticação para rotas protegidas.
+ * Camada de Presentation - responsável apenas por autorização.
+ *
+ * Responsabilidades:
+ * - Verificar se rota é pública (@Public decorator)
+ * - Extrair e validar token de autenticação (delega para IAuthService)
+ * - Sincronizar usuário com banco local (delega para Use Case)
+ * - Verificar se conta está ativa
+ * - Anexar dados do usuário ao request para @CurrentUser decorator
+ *
+ * Clean Architecture:
+ * - Depende de IAuthService (abstração), não de implementação concreta
+ * - Delega lógica de negócio para Use Cases
+ * - Mantém apenas lógica de autorização HTTP
+ */
 @Injectable()
 export class SupabaseAuthGuard {
-  private readonly supabase: SupabaseClient;
-
   constructor(
     private reflector: Reflector,
-    private readonly configService: ConfigService,
-    @Inject(USER_REPOSITORY)
-    private readonly userRepository: IUserRepository,
-  ) {
-    const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
-    const supabaseKey = this.configService.get<string>(
-      'SUPABASE_PUBLISHABLE_KEY',
-    );
-
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase URL and PUBLISHABLE_KEY must be defined');
-    }
-
-    this.supabase = createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
-  }
+    @Inject(AUTH_SERVICE)
+    private readonly authService: IAuthService,
+    private readonly syncUserUseCase: SyncUserWithSupabaseUseCase,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Check if route is public
+    // 1. Verificar se rota é pública (@Public decorator)
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -50,7 +48,7 @@ export class SupabaseAuthGuard {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<any>();
     const token = this.extractTokenFromHeader(request);
 
     if (!token) {
@@ -58,41 +56,22 @@ export class SupabaseAuthGuard {
     }
 
     try {
-      // Validate token with Supabase Auth server
-      const { data, error } = await this.supabase.auth.getUser(token);
+      // 2. Validar token com serviço de autenticação (delega para IAuthService)
+      const authenticatedUser = await this.authService.validateToken(token);
 
-      if (error || !data.user) {
+      if (!authenticatedUser) {
         throw new UnauthorizedException('Invalid or expired token');
       }
 
-      const supabaseUser = data.user;
+      // 3. Sincronizar usuário com banco local (delega para Use Case)
+      const user = await this.syncUserUseCase.execute(authenticatedUser);
 
-      // Find or create user in local database
-      let user = await this.userRepository.findBySupabaseUserId(
-        supabaseUser.id,
-      );
-
-      if (!user) {
-        // Auto-create user on first authenticated request
-        user = await this.userRepository.create(
-          UserEntity.create(
-            supabaseUser.email!,
-            supabaseUser.id,
-            supabaseUser.user_metadata?.first_name ||
-              supabaseUser.user_metadata?.firstName,
-          ),
-        );
-      } else {
-        // Update last login
-        user.recordLogin();
-        await this.userRepository.update(user.id, user);
-      }
-
+      // 4. Verificar se conta está ativa (autorização)
       if (!user.isActive) {
         throw new UnauthorizedException('User account is disabled');
       }
 
-      // Attach user to request for @CurrentUser decorator
+      // 5. Anexar dados do usuário ao request para @CurrentUser decorator
       request.user = {
         id: user.id,
         email: user.email,

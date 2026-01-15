@@ -18,7 +18,12 @@ if (result.error) {
 process.env.NODE_ENV = 'test';
 
 // Verify required environment variables are present
-if (!process.env.DB_HOST || !process.env.DB_USERNAME || !process.env.DB_PASSWORD || !process.env.DB_DATABASE) {
+if (
+  !process.env.DB_HOST ||
+  !process.env.DB_USERNAME ||
+  !process.env.DB_PASSWORD ||
+  !process.env.DB_DATABASE
+) {
   throw new Error(
     '❌ Database configuration (DB_HOST, DB_USERNAME, DB_PASSWORD, DB_DATABASE) is required. Set them in .env.test (local) or as environment variables (CI)',
   );

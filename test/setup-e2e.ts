@@ -30,9 +30,7 @@ export default async (): Promise<void> => {
         'ℹ️  .env not found, using system environment variables (CI mode)',
       );
     } else {
-      console.log(
-        '✅ Environment variables loaded from .env (local mode)',
-      );
+      console.log('✅ Environment variables loaded from .env (local mode)');
     }
     console.log('🔧 Setting up E2E test environment...');
 
