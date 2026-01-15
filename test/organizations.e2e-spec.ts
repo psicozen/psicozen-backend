@@ -21,10 +21,20 @@ import type {
   OrganizationType,
 } from '../src/modules/organizations/domain/types/organization-settings.types';
 
+// Test Database Utilities
+import { testDataSourceOptions } from './config/test-datasource';
+import {
+  initializeTestDatabase,
+  clearDatabase,
+  closeDatabase,
+  runAsServiceRole,
+} from './utils/test-database.helper';
+import { resetAllFixtures } from './utils/reset-fixtures.helper';
+
 /**
  * E2E Tests for Organizations Module
  *
- * Uses SQLite in-memory database for isolation and speed.
+ * Uses PostgreSQL staging database (Render) for realistic testing.
  * Tests all CRUD operations with role-based authorization:
  * - POST /organizations (SUPER_ADMIN only)
  * - GET /organizations (ADMIN, SUPER_ADMIN)
@@ -118,17 +128,13 @@ describe('OrganizationsController (e2e)', () => {
   let dataSource: DataSource;
 
   beforeAll(async () => {
+    // Initialize PostgreSQL test database
+    await initializeTestDatabase();
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
-        // SQLite in-memory database for tests
-        TypeOrmModule.forRoot({
-          type: 'better-sqlite3',
-          database: ':memory:',
-          entities: [OrganizationSchema],
-          synchronize: true,
-          dropSchema: true,
-          logging: false,
-        }),
+        // PostgreSQL staging database (Render)
+        TypeOrmModule.forRoot(testDataSourceOptions),
         OrganizationsModule,
       ],
     })
@@ -186,11 +192,14 @@ describe('OrganizationsController (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+    await closeDatabase();
   });
 
   beforeEach(async () => {
-    // Clean up organizations table before each test
-    await dataSource.getRepository(OrganizationSchema).clear();
+    // Reset fixture counters to prevent conflicts across multiple test runs
+    resetAllFixtures();
+    // Clean up all tables before each test
+    await clearDatabase();
     // Reset to SUPER_ADMIN for each test
     setTestUser(mockUsers.superAdmin);
   });
@@ -730,11 +739,12 @@ describe('OrganizationsController (e2e)', () => {
 
     describe('Conflict Errors (409)', () => {
       it('should return 409 when organization has children', async () => {
-        // Create child organization
+        // Create child organization with unique name to avoid slug conflicts
+        const childName = `Child Org ${Date.now()}`;
         await request(app.getHttpServer())
           .post('/organizations')
           .send({
-            name: 'Child Org',
+            name: childName,
             type: 'department',
             parentId: createdOrgId,
           })

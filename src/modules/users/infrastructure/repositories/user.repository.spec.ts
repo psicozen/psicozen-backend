@@ -239,7 +239,7 @@ describe('UserRepository', () => {
         { userId },
       );
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        '(ur.organization_id = :organizationId OR r.is_system_role = true)',
+        '(ur.organization_id = :organizationId OR ur.organization_id IS NULL)',
         { organizationId },
       );
       expect(mockQueryBuilder.select).toHaveBeenCalledWith(
@@ -259,7 +259,7 @@ describe('UserRepository', () => {
 
       expect(result).toEqual([Role.SUPER_ADMIN]);
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'r.is_system_role = true',
+        'ur.organization_id IS NULL',
       );
     });
 
@@ -293,7 +293,7 @@ describe('UserRepository', () => {
   describe('findByRoles', () => {
     it('should find users by roles in an organization', async () => {
       const organizationId = 'org-456';
-      const roles = [Role.ADMIN, Role.MANAGER];
+      const roles = [Role.ADMIN, Role.GESTOR];
 
       const mockSchemas = [
         {

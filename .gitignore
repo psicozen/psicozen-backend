@@ -16,8 +16,9 @@
 .idea/**/sqlDataSources.xml
 .idea/**/dynamic.xml
 .idea/**/uiDesigner.xml
-.claude/settings.local.json
 /scripts
+
+.claude/settings.local.json
 
 # Gradle:
 .idea/**/gradle.xml
@@ -397,6 +398,7 @@ Temporary Items
 =======
 # Local
 .env
+.env.test
 dist
 .webpack
 .serverless/**/*.zip
