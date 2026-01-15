@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 
@@ -11,6 +11,7 @@ export interface SendEmailParams {
 
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
   private resend: Resend;
 
   constructor(private readonly configService: ConfigService) {
@@ -22,7 +23,7 @@ export class EmailService {
 
   async send(params: SendEmailParams): Promise<{ id: string }> {
     if (!this.resend) {
-      console.warn('Resend not configured. Email not sent:', params.to);
+      this.logger.warn(`Resend not configured. Email not sent: ${params.to}`);
       return { id: 'mock-id' };
     }
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type {
@@ -23,6 +23,7 @@ import type {
  */
 @Injectable()
 export class SupabaseAuthService implements IAuthService {
+  private readonly logger = new Logger(SupabaseAuthService.name);
   private readonly supabase: SupabaseClient;
 
   constructor(private readonly configService: ConfigService) {
@@ -73,8 +74,7 @@ export class SupabaseAuthService implements IAuthService {
         metadata: supabaseUser.user_metadata as Record<string, any>,
       };
     } catch (error) {
-      // Log error para debugging (considere usar logger em produção)
-      console.error('Token validation error:', error);
+      this.logger.error('Token validation error', error);
       return null;
     }
   }
