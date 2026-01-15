@@ -1,26 +1,16 @@
-import { Injectable, Inject } from '@nestjs/common';
-import type { ISessionRepository } from '../../domain/repositories/session.repository.interface';
-import { SESSION_REPOSITORY } from '../../domain/repositories/session.repository.interface';
+import { Injectable } from '@nestjs/common';
+import { SupabaseService } from '../../../../core/infrastructure/supabase/supabase.service';
 
 @Injectable()
 export class LogoutUseCase {
-  constructor(
-    @Inject(SESSION_REPOSITORY)
-    private readonly sessionRepository: ISessionRepository,
-  ) {}
+  constructor(private readonly supabaseService: SupabaseService) {}
 
-  async execute(
-    userId: string,
-    refreshToken?: string,
-  ): Promise<{ message: string }> {
-    if (refreshToken) {
-      // Logout de sessão específica
-      await this.sessionRepository.revokeByToken(refreshToken);
-      return { message: 'Session revoked successfully' };
-    } else {
-      // Logout de todas as sessões do usuário
-      await this.sessionRepository.revokeAllByUserId(userId);
-      return { message: 'All sessions revoked successfully' };
-    }
+  async execute(supabaseUserId: string): Promise<{ message: string }> {
+    // Sign out from Supabase (revokes session on Supabase side)
+    await this.supabaseService.signOut();
+
+    return {
+      message: 'Logged out successfully',
+    };
   }
 }
