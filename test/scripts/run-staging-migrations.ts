@@ -2,8 +2,8 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import { DataSource } from 'typeorm';
 
-// Load .env.test
-config({ path: resolve(__dirname, '../../.env.test') });
+// Load .env with NODE_ENV=test
+config({ path: resolve(__dirname, '../../.env') });
 
 // Import all entity schemas
 import { OrganizationSchema } from '../../src/modules/organizations/infrastructure/persistence/organization.schema';
@@ -15,7 +15,11 @@ import { UserRoleSchema } from '../../src/modules/roles/infrastructure/persisten
 async function runStagingMigrations() {
   const dataSource = new DataSource({
     type: 'postgres',
-    url: process.env.DATABASE_URL,
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    username: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
     ssl: { rejectUnauthorized: false },
     entities: [
       OrganizationSchema,

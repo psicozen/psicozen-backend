@@ -22,7 +22,7 @@ import { USER_REPOSITORY } from '../../../modules/users/domain/repositories/user
  * - SUPER_ADMIN bypasses organization checks
  *
  * Usage:
- * @UseGuards(JwtAuthGuard, RolesGuard)
+ * @UseGuards(SupabaseAuthGuard, RolesGuard)
  * @Roles(Role.ADMIN)
  * async protectedRoute() { ... }
  */
@@ -47,7 +47,7 @@ export class RolesGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const user = request.user; // From JwtAuthGuard
+    const user = request.user; // From SupabaseAuthGuard
     const organizationId = request.headers['x-organization-id'] as string;
 
     // User must be authenticated

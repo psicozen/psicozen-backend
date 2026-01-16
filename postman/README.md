@@ -26,7 +26,48 @@ Coleção completa do Postman com todos os endpoints da API PsicoZen Backend.
 
 ### 3. Testar a API
 
-#### Opção A: Flow de Autenticação Manual (Desenvolvimento)
+#### Opção A: Obter Token do Console do Navegador (RECOMENDADO) 🚀
+
+**A maneira mais fácil e rápida de testar a API no Postman:**
+
+1. **Faça Login no Frontend**
+   - Acesse http://localhost:3001/login
+   - Faça login com seu email (Magic Link)
+
+2. **Abra o Console do Navegador**
+   - Pressione `F12` ou `Cmd+Option+I` (Mac) / `Ctrl+Shift+I` (Windows/Linux)
+   - Vá para a aba **Console**
+
+3. **Copie o Access Token**
+   - Você verá uma mensagem como:
+   ```
+   ✅ User Signed In (DEV ONLY)
+   ├─ Access Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   ├─ Expires At: 2026-01-15T10:30:00.000Z
+   └─ User: seu-email@example.com
+   ```
+   - Copie o valor do **Access Token**
+
+4. **Configure no Postman**
+   - No Postman, selecione o environment **PsicoZen Production Environment**
+   - Clique no ícone de **olho** (👁️)
+   - Clique em **Edit**
+   - Cole o token no campo **CURRENT VALUE** da variável `accessToken`
+   - Clique em **Save**
+
+5. **Testar Endpoints Protegidos**
+   - Agora você pode executar qualquer endpoint protegido
+   - O token será incluído automaticamente no header `Authorization: Bearer <token>`
+   - Exemplo: Execute `GET /auth/me` para ver seu perfil
+
+**⚠️ Observações:**
+- O token expira em ~1 hora (veja `Expires At` no console)
+- Quando expirar, basta fazer login novamente e copiar o novo token
+- Os logs **só aparecem em modo desenvolvimento** (`NODE_ENV=development`)
+
+---
+
+#### Opção B: Flow de Autenticação Manual (Desenvolvimento)
 
 1. **Send Magic Link**
    - Execute `POST /auth/send-magic-link`
@@ -42,7 +83,9 @@ Coleção completa do Postman com todos os endpoints da API PsicoZen Backend.
    - Agora você pode executar qualquer endpoint protegido
    - O token de acesso será incluído automaticamente no header `Authorization`
 
-#### Opção B: Flow de Autenticação com Supabase (Produção)
+---
+
+#### Opção C: Flow de Autenticação com Supabase (Produção)
 
 Se você já tem um usuário autenticado no Supabase:
 
@@ -131,6 +174,20 @@ Adicionados automaticamente pela collection:
 - `Authorization: Bearer {{accessToken}}` (endpoints protegidos)
 
 ## 🔄 Workflow Recomendado
+
+### Quick Start (Mais Rápido) ⚡
+
+```
+Login Frontend (http://localhost:3001/login)
+         ↓
+F12 → Console → Copiar Access Token
+         ↓
+Postman → Environment → Colar Token
+         ↓
+Testar Endpoints Protegidos 🎉
+```
+
+### Workflow Completo
 
 1. **Desenvolvimento Local**
    ```

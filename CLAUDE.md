@@ -57,24 +57,15 @@ src/
 │       └── filters/                    # AllExceptionsFilter
 │
 ├── modules/                            # Feature modules
-│   ├── auth/                           # Magic Link Authentication
-│   │   ├── domain/
-│   │   │   ├── entities/session.entity.ts
-│   │   │   └── repositories/session.repository.interface.ts
+│   ├── auth/                           # Magic Link Authentication (Supabase)
 │   │   ├── application/
 │   │   │   ├── use-cases/
 │   │   │   │   ├── send-magic-link.use-case.ts
-│   │   │   │   ├── verify-magic-link.use-case.ts
-│   │   │   │   ├── refresh-token.use-case.ts
 │   │   │   │   └── logout.use-case.ts
 │   │   │   └── dtos/
-│   │   ├── infrastructure/
-│   │   │   ├── persistence/session.schema.ts
-│   │   │   ├── repositories/session.repository.ts
-│   │   │   └── strategies/jwt.strategy.ts
 │   │   ├── presentation/
 │   │   │   ├── controllers/auth.controller.ts
-│   │   │   └── guards/jwt-auth.guard.ts
+│   │   │   └── guards/supabase-auth.guard.ts  # Direct Supabase SDK validation
 │   │   └── auth.module.ts
 │   │
 │   ├── users/                          # User Management
@@ -259,31 +250,151 @@ export class UserRepository
 
 ---
 
-## Authentication Flow (Magic Link)
+## Authentication Flow (Supabase Magic Link + Direct Token Validation)
+
+### Architecture Overview
+
+**✅ Simplified Approach (Current Implementation)**
+- **No Passport.js** - Direct Supabase SDK integration
+- **No custom JWT strategies** - Supabase handles all token validation
+- **Algorithm agnostic** - Works with ES256, HS256, RS256 automatically
+- **Global guard** - All routes protected by default, opt-out with `@Public()`
+
+### Authentication Flow
 
 ```
 1. POST /auth/send-magic-link { email }
-   → Supabase sends email with magic link
+   → Supabase Auth sends magic link email
+   → User clicks link → Redirected to frontend with access_token
 
-2. GET /auth/callback?token_hash=xxx&type=magiclink
-   → Verifies with Supabase
-   → Creates/updates user in local DB
-   → Generates JWT tokens (access + refresh)
-   → Saves session
+2. Frontend stores access_token and makes requests:
+   Authorization: Bearer <supabase_access_token>
 
-3. Protected routes use Authorization: Bearer <access_token>
-   → JwtAuthGuard validates token
-   → JwtStrategy verifies and returns user payload
-   → @CurrentUser() decorator injects user into controller
+3. SupabaseAuthGuard (Global) validates ALL requests:
+   ├─ Check @Public() decorator → Skip auth if present
+   ├─ Extract Bearer token from Authorization header
+   ├─ Call supabase.auth.getUser(token) → Validates with Supabase Auth server
+   │  └─ ✅ Detects revoked tokens, expired sessions, invalid signatures
+   ├─ Find or create user in local database
+   │  └─ Auto-creates user on first authenticated request
+   ├─ Update last login timestamp
+   ├─ Check if account is active
+   └─ Attach user payload to request.user
 
-4. POST /auth/refresh { refreshToken }
-   → Validates refresh token
-   → Generates new access token
-   → Rotates refresh token (security best practice)
+4. @CurrentUser() decorator injects authenticated user in controllers
 
-5. POST /auth/logout { refreshToken? }
-   → Revokes specific session or all user sessions
+5. POST /auth/logout
+   → Calls supabase.auth.signOut()
+   → Revokes Supabase session
 ```
+
+### Key Components
+
+**1. SupabaseAuthGuard** (`src/modules/auth/presentation/guards/supabase-auth.guard.ts`)
+```typescript
+@Injectable()
+export class SupabaseAuthGuard {
+  private readonly supabase: SupabaseClient;
+
+  constructor(
+    private reflector: Reflector,
+    private readonly configService: ConfigService,
+    @Inject(USER_REPOSITORY)
+    private readonly userRepository: IUserRepository,
+  ) {
+    // Initialize Supabase client
+    this.supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+  }
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    // 1. Check @Public() decorator
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) return true;
+
+    // 2. Extract and validate token
+    const token = this.extractTokenFromHeader(request);
+    const { data, error } = await this.supabase.auth.getUser(token);
+
+    // 3. Auto-create or update user in local DB
+    // 4. Attach user to request
+    return true;
+  }
+}
+```
+
+**2. AppModule Registration** (`src/app.module.ts`)
+```typescript
+providers: [
+  // Global Auth Guard - protects all routes by default
+  {
+    provide: APP_GUARD,
+    useClass: SupabaseAuthGuard,
+  },
+]
+```
+
+**3. AuthModule** (`src/modules/auth/auth.module.ts`)
+```typescript
+@Global()
+@Module({
+  imports: [ConfigModule, SupabaseModule, UsersModule],
+  providers: [SupabaseAuthGuard, SendMagicLinkUseCase, LogoutUseCase],
+  exports: [SupabaseAuthGuard],
+})
+export class AuthModule {}
+```
+
+### Usage Examples
+
+**Protected Endpoint (Default):**
+```typescript
+@Get('me')
+async getProfile(@CurrentUser() user: UserEntity) {
+  return { success: true, user };
+}
+```
+
+**Public Endpoint (Opt-out):**
+```typescript
+@Public()
+@Post('send-magic-link')
+async sendMagicLink(@Body() dto: SendMagicLinkDto) {
+  return await this.sendMagicLinkUseCase.execute(dto);
+}
+```
+
+**Extract Specific User Property:**
+```typescript
+@Post('logout')
+async logout(@CurrentUser('supabaseUserId') supabaseUserId: string) {
+  return await this.logoutUseCase.execute(supabaseUserId);
+}
+```
+
+### Why This Approach?
+
+**✅ Advantages:**
+1. **Simplicity**: ~50% less code than Passport.js strategy approach
+2. **Reliability**: Supabase SDK handles all edge cases (ES256, RS256, HS256, key rotation)
+3. **Security**: Always validates with Supabase Auth server (detects revoked tokens)
+4. **Maintainability**: No custom JWT strategies to maintain
+5. **Future-proof**: Works with Supabase Auth updates automatically
+
+**❌ Removed Dependencies:**
+- `@nestjs/passport` - Not needed anymore
+- `passport` - Not needed anymore
+- `passport-jwt` - Not needed anymore
+
+**⚠️ Important Notes:**
+- Token validation requires network call to Supabase (adds latency ~50-100ms)
+- For high-traffic apps, consider caching valid tokens with short TTL
+- `SUPABASE_JWT_SECRET` is not used in this approach (only for legacy HS256 validation)
+- All routes are protected by default - use `@Public()` to make routes accessible without auth
 
 ---
 
@@ -515,22 +626,58 @@ Swagger UI available at: `http://localhost:3000/api/docs`
 ## Guards & Decorators
 
 **Guards:**
-- `JwtAuthGuard` - Global guard (applied to all routes except `@Public()`)
+- `SupabaseAuthGuard` - **Global guard** (applied automatically to ALL routes)
+  - Validates Supabase JWT tokens via `supabase.auth.getUser(token)`
+  - Auto-creates users in local DB on first authenticated request
+  - Updates last login timestamp
+  - Checks account active status
 - `RolesGuard` - Check user roles with `@Roles('admin', 'moderator')`
 
 **Decorators:**
-- `@Public()` - Skip JWT authentication
-- `@CurrentUser()` - Inject authenticated user
-- `@CurrentUser('id')` - Inject specific user property
+- `@Public()` - **Skip authentication** (make route publicly accessible)
+- `@CurrentUser()` - Inject authenticated user entity
+- `@CurrentUser('id')` - Inject specific user property (id, email, firstName, etc.)
 - `@Roles(...roles)` - Require specific roles
 
-**Example:**
+**Important:** All routes are **protected by default**. Use `@Public()` to make a route accessible without authentication.
+
+**Examples:**
+
+**Protected Route (Default - No decorator needed):**
 ```typescript
-@UseGuards(JwtAuthGuard, RolesGuard)
+@Get('profile')
+async getProfile(@CurrentUser() user: UserEntity) {
+  return { success: true, user };
+}
+```
+
+**Public Route (Opt-out with @Public()):**
+```typescript
+@Public()
+@Post('send-magic-link')
+async sendMagicLink(@Body() dto: SendMagicLinkDto) {
+  return await this.sendMagicLinkUseCase.execute(dto);
+}
+```
+
+**Extract Specific Property:**
+```typescript
+@Post('update-settings')
+async updateSettings(
+  @CurrentUser('id') userId: string,
+  @Body() dto: UpdateSettingsDto,
+) {
+  return await this.updateSettingsUseCase.execute(userId, dto);
+}
+```
+
+**With Role Guard:**
+```typescript
+@UseGuards(RolesGuard)
 @Roles('admin')
-@Get('admin-only')
-async adminRoute(@CurrentUser() user: UserPayload) {
-  return { user };
+@Get('admin-dashboard')
+async adminDashboard(@CurrentUser() user: UserEntity) {
+  return { user, adminData: '...' };
 }
 ```
 
@@ -538,13 +685,14 @@ async adminRoute(@CurrentUser() user: UserPayload) {
 
 ## Key Design Decisions
 
-1. **Request-Scoped Supabase**: Prevents session leakage between requests
-2. **Dual Database**: Supabase Auth + TypeORM for application data
-3. **Token Rotation**: Refresh tokens rotated on every refresh for security
-4. **Soft Deletes**: Users can be soft-deleted with `deletedAt` timestamp
-5. **JSONB Columns**: Flexible storage for `preferences` and `metadata`
-6. **Symbol Injection**: Type-safe dependency injection without circular dependencies
-7. **Global Guards**: JWT auth by default, opt-out with `@Public()`
+1. **Direct Supabase SDK Validation**: No Passport.js - simpler, more reliable, algorithm-agnostic
+2. **Global Authentication Guard**: All routes protected by default, opt-out with `@Public()`
+3. **Auto-User Creation**: Users automatically created in local DB on first authenticated request
+4. **Dual Database**: Supabase Auth for authentication + TypeORM for application data
+5. **Soft Deletes**: Users can be soft-deleted with `deletedAt` timestamp
+6. **JSONB Columns**: Flexible storage for `preferences` and `metadata`
+7. **Symbol Injection**: Type-safe dependency injection without circular dependencies
+8. **Clean Architecture**: Domain → Application → Infrastructure → Presentation layers
 
 ---
 

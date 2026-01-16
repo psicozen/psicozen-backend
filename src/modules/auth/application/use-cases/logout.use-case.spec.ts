@@ -1,32 +1,30 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LogoutUseCase } from './logout.use-case';
-import {
-  ISessionRepository,
-  SESSION_REPOSITORY,
-} from '../../domain/repositories/session.repository.interface';
+import type { IAuthService } from '../../domain/services/auth.service.interface';
+import { AUTH_SERVICE } from '../../domain/services/auth.service.interface';
 
 describe('LogoutUseCase', () => {
   let useCase: LogoutUseCase;
-  let sessionRepository: jest.Mocked<ISessionRepository>;
+  let authService: jest.Mocked<IAuthService>;
 
   beforeEach(async () => {
-    const mockSessionRepository = {
-      revokeByToken: jest.fn(),
-      revokeAllByUserId: jest.fn(),
+    const mockAuthService: jest.Mocked<IAuthService> = {
+      signOut: jest.fn(),
+      validateToken: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LogoutUseCase,
         {
-          provide: SESSION_REPOSITORY,
-          useValue: mockSessionRepository,
+          provide: AUTH_SERVICE,
+          useValue: mockAuthService,
         },
       ],
     }).compile();
 
     useCase = module.get<LogoutUseCase>(LogoutUseCase);
-    sessionRepository = module.get(SESSION_REPOSITORY);
+    authService = module.get(AUTH_SERVICE);
   });
 
   it('should be defined', () => {
@@ -34,37 +32,27 @@ describe('LogoutUseCase', () => {
   });
 
   describe('execute', () => {
-    it('should revoke specific session when refresh token provided', async () => {
-      const userId = 'user-123';
-      const refreshToken = 'refresh-token-abc';
+    it('should sign out successfully using auth service', async () => {
+      const supabaseUserId = 'supabase-user-123';
 
-      const result = await useCase.execute(userId, refreshToken);
+      authService.signOut.mockResolvedValue(undefined);
 
-      expect(result.message).toBe('Session revoked successfully');
-      expect(sessionRepository.revokeByToken).toHaveBeenCalledWith(
-        refreshToken,
-      );
-      expect(sessionRepository.revokeAllByUserId).not.toHaveBeenCalled();
+      const result = await useCase.execute(supabaseUserId);
+
+      expect(result.message).toBe('Logged out successfully');
+      expect(authService.signOut).toHaveBeenCalledTimes(1);
     });
 
-    it('should revoke all user sessions when no refresh token provided', async () => {
-      const userId = 'user-123';
+    it('should handle auth service errors gracefully', async () => {
+      const supabaseUserId = 'supabase-user-123';
 
-      const result = await useCase.execute(userId);
-
-      expect(result.message).toBe('All sessions revoked successfully');
-      expect(sessionRepository.revokeAllByUserId).toHaveBeenCalledWith(userId);
-      expect(sessionRepository.revokeByToken).not.toHaveBeenCalled();
-    });
-
-    it('should handle repository errors gracefully', async () => {
-      const userId = 'user-123';
-
-      sessionRepository.revokeAllByUserId.mockRejectedValue(
-        new Error('Database error'),
+      authService.signOut.mockRejectedValue(
+        new Error('Auth service signOut error'),
       );
 
-      await expect(useCase.execute(userId)).rejects.toThrow();
+      await expect(useCase.execute(supabaseUserId)).rejects.toThrow(
+        'Auth service signOut error',
+      );
     });
   });
 });

@@ -2,13 +2,17 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import { DataSource } from 'typeorm';
 
-// Load .env.test
-config({ path: resolve(__dirname, '../../.env.test') });
+// Load .env with NODE_ENV=test
+config({ path: resolve(__dirname, '../../.env') });
 
 async function resetTestDatabase() {
   const dataSource = new DataSource({
     type: 'postgres',
-    url: process.env.DATABASE_URL,
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    username: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
     ssl: { rejectUnauthorized: false },
     synchronize: false,
     logging: true,

@@ -15,4 +15,5 @@ export const getDatabaseConfig = (
   synchronize: false, // NUNCA true em produção
   logging: configService.get<string>('NODE_ENV') === 'development',
   autoLoadEntities: true,
+  ssl: { rejectUnauthorized: false }, // Required for Supabase PostgreSQL
 });

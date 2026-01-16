@@ -7,8 +7,8 @@ export class SendMagicLinkDto {
   @IsNotEmpty()
   email: string;
 
-  @ApiPropertyOptional({ example: 'http://localhost:3001/auth/callback' })
+  @ApiPropertyOptional({ example: 'http://localhost:3000/auth/callback' })
   @IsOptional()
-  @IsUrl({ require_protocol: true })
+  @IsUrl({ require_protocol: true, require_tld: false })
   redirectTo?: string;
 }

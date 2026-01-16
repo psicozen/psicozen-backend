@@ -107,12 +107,13 @@ describe('GetAggregatedReportUseCase', () => {
       expect(result).toBeDefined();
       expect(result.summary.totalSubmissions).toBe(100);
       expect(result.summary.averageEmotionLevel).toBe(4.5);
-      expect(submissionRepository.getAggregatedByTimeRange).toHaveBeenCalledWith(
-        organizationId,
-        startDate,
-        endDate,
-        { department: undefined, team: undefined, categoryId: undefined },
-      );
+      expect(
+        submissionRepository.getAggregatedByTimeRange,
+      ).toHaveBeenCalledWith(organizationId, startDate, endDate, {
+        department: undefined,
+        team: undefined,
+        categoryId: undefined,
+      });
     });
 
     it('should pass filters to repository correctly', async () => {
@@ -128,12 +129,13 @@ describe('GetAggregatedReportUseCase', () => {
 
       await useCase.execute(dtoWithFilters, organizationId);
 
-      expect(submissionRepository.getAggregatedByTimeRange).toHaveBeenCalledWith(
-        organizationId,
-        startDate,
-        endDate,
-        { department: 'Engineering', team: 'Backend', categoryId: 'cat-123' },
-      );
+      expect(
+        submissionRepository.getAggregatedByTimeRange,
+      ).toHaveBeenCalledWith(organizationId, startDate, endDate, {
+        department: 'Engineering',
+        team: 'Backend',
+        categoryId: 'cat-123',
+      });
     });
 
     describe('summary calculations', () => {

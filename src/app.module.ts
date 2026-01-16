@@ -11,10 +11,10 @@ import { getDatabaseConfig } from './config/database.config';
 // Core
 import { SupabaseModule } from './core/infrastructure/supabase/supabase.module';
 import { AllExceptionsFilter } from './core/presentation/filters/http-exception.filter';
-import { JwtAuthGuard } from './modules/auth/presentation/guards/jwt-auth.guard';
 
 // Feature Modules
 import { AuthModule } from './modules/auth/auth.module';
+import { SupabaseAuthGuard } from './modules/auth/presentation/guards/supabase-auth.guard';
 import { UsersModule } from './modules/users/users.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { FilesModule } from './modules/files/files.module';
@@ -72,10 +72,10 @@ import { AppService } from './app.service';
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,
     },
-    // Global JWT Guard (can be overridden with @Public())
+    // Global Auth Guard - registered here after AuthModule is fully initialized
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard,
+      useClass: SupabaseAuthGuard,
     },
   ],
 })

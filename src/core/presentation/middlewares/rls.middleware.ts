@@ -2,26 +2,31 @@ import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { DataSource } from 'typeorm';
 import { runInTransaction } from '../../infrastructure/database/rls.storage';
-import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import * as jwt from 'jsonwebtoken';
 
 @Injectable()
 export class RlsMiddleware implements NestMiddleware {
   private readonly logger = new Logger(RlsMiddleware.name);
+  private readonly jwtSecret: string;
 
   constructor(
     private readonly dataSource: DataSource,
-    private readonly jwtService: JwtService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.jwtSecret = this.configService.get<string>('SUPABASE_JWT_SECRET')!;
+  }
 
   async use(req: Request, res: Response, next: NextFunction) {
-    // Extract user ID from token if present, but don't fail if not
+    // Extract user ID from Supabase token if present, but don't fail if not
     // We do manual extraction because Guards run AFTER middleware, so user is not yet attached to request
     let userId: string | null = null;
 
     if (req.headers.authorization) {
       try {
         const token = req.headers.authorization.replace('Bearer ', '');
-        const payload = this.jwtService.decode(token);
+        // Decode without verification (verification happens in SupabaseAuthGuard)
+        const payload = jwt.decode(token) as any;
         if (payload && payload.sub) {
           userId = payload.sub;
         }

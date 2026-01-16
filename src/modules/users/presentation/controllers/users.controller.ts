@@ -19,7 +19,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
+import { SupabaseAuthGuard } from '../../../auth/presentation/guards/supabase-auth.guard';
 import { CurrentUser } from '../../../../core/presentation/decorators/current-user.decorator';
 import {
   PaginationDto,
@@ -40,7 +40,7 @@ import {
 
 @ApiTags('users')
 @Controller('users')
-@UseGuards(JwtAuthGuard)
+@UseGuards(SupabaseAuthGuard)
 @ApiBearerAuth()
 export class UsersController {
   constructor(

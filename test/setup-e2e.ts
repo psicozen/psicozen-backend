@@ -20,27 +20,28 @@ import { UserRoleSchema } from '../src/modules/roles/infrastructure/persistence/
  */
 export default async (): Promise<void> => {
   try {
-    // Try to load .env.test if it exists (for local development)
-    // In CI, environment variables come from GitHub Secrets
-    const envTestPath = resolve(__dirname, '../.env.test');
-    const result = config({ path: envTestPath });
+    // Load .env file with NODE_ENV=test
+    const envPath = resolve(__dirname, '../.env');
+    const result = config({ path: envPath });
 
     if (result.error) {
-      // Don't fail if .env.test doesn't exist - use system env vars (CI)
+      // Don't fail if .env doesn't exist - use system env vars (CI)
       console.log(
-        'ℹ️  .env.test not found, using system environment variables (CI mode)',
+        'ℹ️  .env not found, using system environment variables (CI mode)',
       );
     } else {
-      console.log(
-        '✅ Environment variables loaded from .env.test (local mode)',
-      );
+      console.log('✅ Environment variables loaded from .env (local mode)');
     }
     console.log('🔧 Setting up E2E test environment...');
 
     // Create DataSource with inline configuration to avoid module resolution issues
     const dataSource = new DataSource({
       type: 'postgres',
-      url: process.env.DATABASE_URL,
+      host: process.env.DB_HOST,
+      port: parseInt(process.env.DB_PORT || '5432', 10),
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_DATABASE,
       ssl: {
         rejectUnauthorized: false,
       },

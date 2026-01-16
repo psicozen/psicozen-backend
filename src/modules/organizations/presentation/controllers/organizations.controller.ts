@@ -19,7 +19,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
+import { SupabaseAuthGuard } from '../../../auth/presentation/guards/supabase-auth.guard';
 import { RolesGuard } from '../../../../core/presentation/guards/roles.guard';
 import { Roles } from '../../../../core/presentation/decorators/roles.decorator';
 import { Role } from '../../../roles/domain/enums/role.enum';
@@ -42,7 +42,7 @@ import {
 
 @ApiTags('organizations')
 @Controller('organizations')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(SupabaseAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class OrganizationsController {
   constructor(
