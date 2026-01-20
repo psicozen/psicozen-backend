@@ -155,6 +155,78 @@ describe('UserRepository', () => {
     });
   });
 
+  describe('findByIdWithDeleted', () => {
+    it('should find user by ID including soft-deleted users', async () => {
+      const mockSchema = {
+        id: 'user-123',
+        email: 'deleted@example.com',
+        firstName: 'Deleted',
+        supabaseUserId: 'supabase-456',
+        preferences: {
+          language: 'en',
+          theme: 'light',
+          notifications: true,
+          timezone: 'UTC',
+        },
+        isActive: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: new Date(), // User is soft-deleted
+      } as UserSchema;
+
+      typeOrmRepository.findOne.mockResolvedValue(mockSchema);
+
+      const result = await repository.findByIdWithDeleted('user-123');
+
+      expect(result).toBeInstanceOf(UserEntity);
+      expect(result?.id).toBe('user-123');
+      expect(result?.deletedAt).toBeDefined();
+      expect(typeOrmRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'user-123' },
+        withDeleted: true,
+      });
+    });
+
+    it('should return null when user does not exist even with withDeleted', async () => {
+      typeOrmRepository.findOne.mockResolvedValue(null);
+
+      const result = await repository.findByIdWithDeleted('non-existent');
+
+      expect(result).toBeNull();
+      expect(typeOrmRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'non-existent' },
+        withDeleted: true,
+      });
+    });
+
+    it('should find non-deleted user as well', async () => {
+      const mockSchema = {
+        id: 'active-user',
+        email: 'active@example.com',
+        firstName: 'Active',
+        supabaseUserId: 'supabase-789',
+        preferences: {
+          language: 'en',
+          theme: 'dark',
+          notifications: true,
+          timezone: 'UTC',
+        },
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null, // User is NOT soft-deleted
+      } as UserSchema;
+
+      typeOrmRepository.findOne.mockResolvedValue(mockSchema);
+
+      const result = await repository.findByIdWithDeleted('active-user');
+
+      expect(result).toBeInstanceOf(UserEntity);
+      expect(result?.id).toBe('active-user');
+      expect(result?.deletedAt).toBeNull();
+    });
+  });
+
   describe('toDomain', () => {
     it('should convert schema to domain entity', () => {
       const mockSchema = {

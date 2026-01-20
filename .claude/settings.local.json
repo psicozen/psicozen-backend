@@ -19,7 +19,9 @@
       "Bash(perl -i -pe:*)",
       "Bash(perl:*)",
       "Bash(dir:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(npm run test:e2e:*)",
+      "Bash(del \"C:\\\\Users\\\\rikdi\\\\OneDrive\\\\Documentos\\\\GitHub\\\\psicozen-backend\\\\test\\\\users-supabase-integration.e2e-spec.ts\")"
     ]
   }
 }

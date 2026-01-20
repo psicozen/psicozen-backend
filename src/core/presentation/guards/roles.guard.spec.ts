@@ -43,6 +43,7 @@ describe('RolesGuard', () => {
     userRepository = {
       getRolesByOrganization: jest.fn(),
       findById: jest.fn(),
+      findByIdWithDeleted: jest.fn(),
       findByEmail: jest.fn(),
       findBySupabaseUserId: jest.fn(),
       existsByEmail: jest.fn(),
