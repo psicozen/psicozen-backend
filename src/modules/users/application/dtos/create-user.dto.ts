@@ -5,8 +5,34 @@ import {
   IsString,
   MinLength,
   MaxLength,
+  IsBoolean,
+  IsIn,
+  ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+
+export class UserPreferencesDto {
+  @ApiPropertyOptional({ example: 'pt-BR' })
+  @IsOptional()
+  @IsString()
+  language?: string;
+
+  @ApiPropertyOptional({ example: 'dark', enum: ['light', 'dark', 'system'] })
+  @IsOptional()
+  @IsIn(['light', 'dark', 'system'])
+  theme?: 'light' | 'dark' | 'system';
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  notifications?: boolean;
+
+  @ApiPropertyOptional({ example: 'America/Sao_Paulo' })
+  @IsOptional()
+  @IsString()
+  timezone?: string;
+}
 
 export class CreateUserDto {
   @ApiProperty({ example: 'user@example.com' })
@@ -39,4 +65,13 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   supabaseUserId?: string;
+
+  @ApiPropertyOptional({
+    type: UserPreferencesDto,
+    example: { theme: 'dark', language: 'pt-BR' },
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UserPreferencesDto)
+  preferences?: UserPreferencesDto;
 }

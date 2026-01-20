@@ -75,6 +75,14 @@ export class UserRepository
     return count > 0;
   }
 
+  async findByIdWithDeleted(id: string): Promise<UserEntity | null> {
+    const schema = await this.repository.findOne({
+      where: { id },
+      withDeleted: true,
+    });
+    return schema ? this.toDomain(schema) : null;
+  }
+
   async getRolesByOrganization(
     userId: string,
     organizationId?: string,

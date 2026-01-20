@@ -8,6 +8,12 @@ export interface IUserRepository extends IBaseRepository<UserEntity> {
   existsByEmail(email: string): Promise<boolean>;
 
   /**
+   * Find user by ID including soft-deleted users.
+   * Useful for cleanup operations that need to access deleted records.
+   */
+  findByIdWithDeleted(id: string): Promise<UserEntity | null>;
+
+  /**
    * Get all roles for a user, optionally filtered by organization.
    *
    * @param userId - The user's ID
