@@ -110,7 +110,8 @@ describe('SubmitEmociogramaUseCase', () => {
     };
 
     const mockAlertService: jest.Mocked<IAlertService> = {
-      triggerEmotionalAlert: jest.fn().mockResolvedValue(undefined),
+      triggerEmotionalAlert: jest.fn().mockResolvedValue(null),
+      resolveAlert: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
