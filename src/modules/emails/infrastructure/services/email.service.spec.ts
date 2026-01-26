@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
 import { EmailService } from './email.service';
 
 describe('EmailService', () => {
   let service: EmailService;
   let configService: jest.Mocked<ConfigService>;
+  let loggerWarnSpy: jest.SpyInstance;
 
   beforeEach(async () => {
     const mockConfigService = {
@@ -27,6 +29,13 @@ describe('EmailService', () => {
 
     service = module.get<EmailService>(EmailService);
     configService = module.get(ConfigService);
+
+    // Spy on Logger.prototype.warn to capture log calls
+    loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+  });
+
+  afterEach(() => {
+    loggerWarnSpy.mockRestore();
   });
 
   it('should be defined', () => {
@@ -48,20 +57,15 @@ describe('EmailService', () => {
     });
 
     it('should log warning when Resend not configured', async () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-
       await service.send({
         to: 'test@example.com',
         subject: 'Test',
         html: '<p>Test</p>',
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Resend not configured. Email not sent:',
-        'test@example.com',
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        'Resend not configured. Email not sent: test@example.com',
       );
-
-      consoleSpy.mockRestore();
     });
   });
 
