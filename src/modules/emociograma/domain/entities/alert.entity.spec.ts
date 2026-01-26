@@ -349,7 +349,8 @@ describe('EmociogramaAlertEntity', () => {
           submittedAt: new Date(),
         });
 
-        const message = EmociogramaAlertEntity.generateAlertMessage(submission);
+        const message =
+          EmociogramaAlertEntity.generateAlertMessage(submission);
 
         expect(message).toContain(expectedEmoji);
         expect(message).toContain(`Nível ${level}/10`);
