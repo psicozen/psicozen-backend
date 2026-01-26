@@ -231,7 +231,9 @@ describe('CommentModerationService', () => {
       });
 
       it('should escape all HTML special characters together', () => {
-        const result = service.moderateComment('<div class="test">\'text\'</div>');
+        const result = service.moderateComment(
+          '<div class="test">\'text\'</div>',
+        );
 
         expect(result.sanitizedComment).toBe(
           '&lt;div class=&quot;test&quot;&gt;&#x27;text&#x27;&lt;/div&gt;',
@@ -279,7 +281,7 @@ describe('CommentModerationService', () => {
         expect(result.isFlagged).toBe(true);
         expect(result.flagReasons).toBeDefined();
         // Should have both: 'Conteúdo sensível detectado' AND 'Conteúdo inadequado filtrado'
-        expect(result.flagReasons!.length).toBeGreaterThanOrEqual(2);
+        expect(result.flagReasons.length).toBeGreaterThanOrEqual(2);
         expect(result.flagReasons).toContain(
           'Conteúdo sensível detectado - requer atenção',
         );
