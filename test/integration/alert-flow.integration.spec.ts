@@ -27,6 +27,31 @@ import { createUserFixture } from '../fixtures/user.fixtures';
 import { createCompanyFixture } from '../fixtures/organization.fixtures';
 
 /**
+ * Helper function to convert EmociogramaSubmissionSchema to EmociogramaSubmissionEntity
+ * Centralizes the mapping logic to avoid code duplication and improve maintainability
+ */
+function mapSchemaToSubmissionEntity(
+  schema: EmociogramaSubmissionSchema,
+): EmociogramaSubmissionEntity {
+  return new EmociogramaSubmissionEntity({
+    id: schema.id,
+    organizationId: schema.organizationId,
+    userId: schema.userId,
+    emotionLevel: schema.emotionLevel,
+    emotionEmoji: schema.emotionEmoji,
+    categoryId: schema.categoryId,
+    isAnonymous: schema.isAnonymous,
+    comment: schema.comment,
+    commentFlagged: schema.commentFlagged,
+    submittedAt: schema.submittedAt,
+    department: schema.department,
+    team: schema.team,
+    createdAt: schema.createdAt,
+    updatedAt: schema.updatedAt,
+  });
+}
+
+/**
  * Alert Flow Integration Tests
  *
  * Tests the complete alert lifecycle:
@@ -99,12 +124,6 @@ describe('Alert Flow Integration Tests', () => {
       gestor: gestorRole,
       colaborador: colaboradorRole,
     };
-
-    console.log('✅ Using seed roles for alert tests:', {
-      admin: savedRoles.admin.id,
-      gestor: savedRoles.gestor.id,
-      colaborador: savedRoles.colaborador.id,
-    });
   });
 
   beforeEach(async () => {
@@ -224,22 +243,7 @@ describe('Alert Flow Integration Tests', () => {
         });
 
       // Convert schema to domain entity for AlertService
-      const submissionEntity = new EmociogramaSubmissionEntity({
-        id: savedSubmission.id,
-        organizationId: savedSubmission.organizationId,
-        userId: savedSubmission.userId,
-        emotionLevel: savedSubmission.emotionLevel,
-        emotionEmoji: savedSubmission.emotionEmoji,
-        categoryId: savedSubmission.categoryId,
-        isAnonymous: savedSubmission.isAnonymous,
-        comment: savedSubmission.comment,
-        commentFlagged: savedSubmission.commentFlagged,
-        submittedAt: savedSubmission.submittedAt,
-        department: savedSubmission.department,
-        team: savedSubmission.team,
-        createdAt: savedSubmission.createdAt,
-        updatedAt: savedSubmission.updatedAt,
-      });
+      const submissionEntity = mapSchemaToSubmissionEntity(savedSubmission);
 
       // ========================================
       // ACT: Trigger alert
@@ -366,19 +370,7 @@ describe('Alert Flow Integration Tests', () => {
         return { savedOrg, savedSubmission };
       });
 
-      const submissionEntity = new EmociogramaSubmissionEntity({
-        id: savedSubmission.id,
-        organizationId: savedSubmission.organizationId,
-        userId: savedSubmission.userId,
-        emotionLevel: savedSubmission.emotionLevel,
-        emotionEmoji: savedSubmission.emotionEmoji,
-        categoryId: savedSubmission.categoryId,
-        isAnonymous: savedSubmission.isAnonymous,
-        commentFlagged: savedSubmission.commentFlagged,
-        submittedAt: savedSubmission.submittedAt,
-        createdAt: savedSubmission.createdAt,
-        updatedAt: savedSubmission.updatedAt,
-      });
+      const submissionEntity = mapSchemaToSubmissionEntity(savedSubmission);
 
       // ACT
       const alert = await alertService.triggerEmotionalAlert(submissionEntity);
@@ -446,19 +438,7 @@ describe('Alert Flow Integration Tests', () => {
           return typeormSubmissionRepository.save(submissionSchema);
         });
 
-        const submissionEntity = new EmociogramaSubmissionEntity({
-          id: savedSubmission.id,
-          organizationId: savedSubmission.organizationId,
-          userId: savedSubmission.userId,
-          emotionLevel: savedSubmission.emotionLevel,
-          emotionEmoji: savedSubmission.emotionEmoji,
-          categoryId: savedSubmission.categoryId,
-          isAnonymous: savedSubmission.isAnonymous,
-          commentFlagged: savedSubmission.commentFlagged,
-          submittedAt: savedSubmission.submittedAt,
-          createdAt: savedSubmission.createdAt,
-          updatedAt: savedSubmission.updatedAt,
-        });
+        const submissionEntity = mapSchemaToSubmissionEntity(savedSubmission);
 
         const alert =
           await alertService.triggerEmotionalAlert(submissionEntity);
@@ -521,19 +501,7 @@ describe('Alert Flow Integration Tests', () => {
         new Error('SMTP connection failed'),
       );
 
-      const submissionEntity = new EmociogramaSubmissionEntity({
-        id: savedSubmission.id,
-        organizationId: savedSubmission.organizationId,
-        userId: savedSubmission.userId,
-        emotionLevel: savedSubmission.emotionLevel,
-        emotionEmoji: savedSubmission.emotionEmoji,
-        categoryId: savedSubmission.categoryId,
-        isAnonymous: savedSubmission.isAnonymous,
-        commentFlagged: savedSubmission.commentFlagged,
-        submittedAt: savedSubmission.submittedAt,
-        createdAt: savedSubmission.createdAt,
-        updatedAt: savedSubmission.updatedAt,
-      });
+      const submissionEntity = mapSchemaToSubmissionEntity(savedSubmission);
 
       // ACT - Should not throw
       const alert = await alertService.triggerEmotionalAlert(submissionEntity);
@@ -601,19 +569,7 @@ describe('Alert Flow Integration Tests', () => {
           return { savedOrg, savedManager, savedSubmission };
         });
 
-      const submissionEntity = new EmociogramaSubmissionEntity({
-        id: savedSubmission.id,
-        organizationId: savedSubmission.organizationId,
-        userId: savedSubmission.userId,
-        emotionLevel: savedSubmission.emotionLevel,
-        emotionEmoji: savedSubmission.emotionEmoji,
-        categoryId: savedSubmission.categoryId,
-        isAnonymous: savedSubmission.isAnonymous,
-        commentFlagged: savedSubmission.commentFlagged,
-        submittedAt: savedSubmission.submittedAt,
-        createdAt: savedSubmission.createdAt,
-        updatedAt: savedSubmission.updatedAt,
-      });
+      const submissionEntity = mapSchemaToSubmissionEntity(savedSubmission);
 
       // Create alert
       const alert = await alertService.triggerEmotionalAlert(submissionEntity);
