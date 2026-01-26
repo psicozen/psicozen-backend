@@ -19,7 +19,8 @@
       "Bash(perl -i -pe:*)",
       "Bash(perl:*)",
       "Bash(dir:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(npm run format:*)"
     ]
   }
 }
