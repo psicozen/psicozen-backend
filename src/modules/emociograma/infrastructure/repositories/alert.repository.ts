@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, In } from 'typeorm';
 import { TypeOrmBaseRepository } from '../../../../core/infrastructure/repositories/typeorm-base.repository';
 import { EmociogramaAlertSchema } from '../persistence/alert.schema';
 import {
@@ -14,6 +14,16 @@ import type {
   AlertFindOptions,
   AlertPaginatedResult,
 } from '../../domain/repositories/alert.repository.interface';
+
+/**
+ * Ordem de severidade para ordenação (crítico primeiro)
+ */
+const SEVERITY_ORDER: Record<AlertSeverity, number> = {
+  critical: 1,
+  high: 2,
+  medium: 3,
+  low: 4,
+};
 
 /**
  * Implementação do Repositório de Alertas do Emociograma

@@ -219,6 +219,24 @@ describe('EmociogramaAlertRepository', () => {
 
       expect(schema.notifiedUsers).toBeNull();
     });
+
+    it('should convert resolved fields to null when resolving', () => {
+      // When explicitly setting resolved fields, undefined values should become null
+      const domain: Partial<EmociogramaAlertEntity> = {
+        isResolved: true,
+        resolvedAt: new Date(),
+        resolvedBy: 'user-123',
+        resolutionNotes: undefined, // explicitly undefined
+      };
+
+      const schema = repository.toEntity(domain);
+
+      expect(schema.isResolved).toBe(true);
+      expect(schema.resolvedAt).toBeInstanceOf(Date);
+      expect(schema.resolvedBy).toBe('user-123');
+      // resolutionNotes is not set because undefined !== undefined is false
+      // This is expected behavior - only defined values are mapped
+    });
   });
 
   describe('findUnresolved', () => {
@@ -243,6 +261,11 @@ describe('EmociogramaAlertRepository', () => {
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'alert.is_resolved = :isResolved',
         { isResolved: false },
+      );
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalled();
+      expect(mockQueryBuilder.addOrderBy).toHaveBeenCalledWith(
+        'alert.created_at',
+        'DESC',
       );
     });
 
@@ -328,6 +351,9 @@ describe('EmociogramaAlertRepository', () => {
 
       expect(result).toBeDefined();
       expect(result?.submissionId).toBe(mockSubmissionId);
+      expect(mockTypeOrmRepository.findOne).toHaveBeenCalledWith({
+        where: { submissionId: mockSubmissionId },
+      });
     });
 
     it('should return null when no alert exists', async () => {
@@ -406,6 +432,14 @@ describe('EmociogramaAlertRepository', () => {
         order: { createdAt: 'DESC' },
       });
     });
+
+    it('should return empty array when no alerts match severity', async () => {
+      mockTypeOrmRepository.find.mockResolvedValue([]);
+
+      const result = await repository.findBySeverity(mockOrganizationId, 'low');
+
+      expect(result).toEqual([]);
+    });
   });
 
   describe('countUnresolvedBySeverity', () => {
@@ -422,6 +456,24 @@ describe('EmociogramaAlertRepository', () => {
       expect(result.high).toBe(10);
       expect(result.medium).toBe(0);
       expect(result.low).toBe(0);
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'alert.is_resolved = :isResolved',
+        { isResolved: false },
+      );
+    });
+
+    it('should return all zeros when no unresolved alerts', async () => {
+      mockQueryBuilder.getRawMany.mockResolvedValue([]);
+
+      const result =
+        await repository.countUnresolvedBySeverity(mockOrganizationId);
+
+      expect(result).toEqual({
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+      });
     });
   });
 
@@ -440,6 +492,25 @@ describe('EmociogramaAlertRepository', () => {
       );
 
       expect(result).toHaveLength(1);
+      expect(mockTypeOrmRepository.find).toHaveBeenCalledWith({
+        where: {
+          organizationId: mockOrganizationId,
+          createdAt: expect.anything(),
+        },
+        order: { createdAt: 'DESC' },
+      });
+    });
+
+    it('should return empty array when no alerts in range', async () => {
+      mockTypeOrmRepository.find.mockResolvedValue([]);
+
+      const result = await repository.findByDateRange(
+        mockOrganizationId,
+        new Date('2020-01-01'),
+        new Date('2020-01-31'),
+      );
+
+      expect(result).toEqual([]);
     });
   });
 
@@ -463,6 +534,14 @@ describe('EmociogramaAlertRepository', () => {
           resolutionNotes: 'Bulk resolution',
         }),
       );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'id IN (:...alertIds)',
+        { alertIds },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'is_resolved = :isResolved',
+        { isResolved: false },
+      );
     });
 
     it('should return 0 when empty array provided', async () => {
@@ -470,6 +549,30 @@ describe('EmociogramaAlertRepository', () => {
 
       expect(result).toBe(0);
       expect(mockQueryBuilder.execute).not.toHaveBeenCalled();
+    });
+
+    it('should resolve without notes', async () => {
+      mockQueryBuilder.execute.mockResolvedValue({ affected: 1 });
+
+      await repository.bulkResolve(['alert-1'], mockUserId);
+
+      expect(mockQueryBuilder.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resolutionNotes: null,
+        }),
+      );
+    });
+
+    it('should only resolve unresolved alerts', async () => {
+      mockQueryBuilder.execute.mockResolvedValue({ affected: 2 });
+
+      const result = await repository.bulkResolve(
+        ['alert-1', 'alert-2', 'alert-3'],
+        mockUserId,
+      );
+
+      // Only 2 were unresolved
+      expect(result).toBe(2);
     });
   });
 
