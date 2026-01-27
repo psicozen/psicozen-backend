@@ -53,7 +53,9 @@ describe('GetAlertDashboardUseCase', () => {
     jest.spyOn(Logger.prototype, 'log').mockImplementation();
     jest.spyOn(Logger.prototype, 'debug').mockImplementation();
 
-    const mockAlertRepository: Partial<jest.Mocked<IEmociogramaAlertRepository>> = {
+    const mockAlertRepository: Partial<
+      jest.Mocked<IEmociogramaAlertRepository>
+    > = {
       getStatistics: jest.fn(),
       findUnresolved: jest.fn(),
       findById: jest.fn(),
@@ -121,8 +123,12 @@ describe('GetAlertDashboardUseCase', () => {
 
       await useCase.execute(organizationId);
 
-      expect(alertRepository.getStatistics).toHaveBeenCalledWith(organizationId);
-      expect(alertRepository.findUnresolved).toHaveBeenCalledWith(organizationId);
+      expect(alertRepository.getStatistics).toHaveBeenCalledWith(
+        organizationId,
+      );
+      expect(alertRepository.findUnresolved).toHaveBeenCalledWith(
+        organizationId,
+      );
     });
 
     it('should execute repository calls in parallel', async () => {

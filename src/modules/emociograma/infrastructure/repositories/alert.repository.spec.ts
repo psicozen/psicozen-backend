@@ -4,7 +4,10 @@ import { Repository } from 'typeorm';
 import { EmociogramaAlertRepository } from './alert.repository';
 import { EmociogramaAlertSchema } from '../persistence/alert.schema';
 import { EmociogramaAlertEntity } from '../../domain/entities/alert.entity';
-import type { AlertSeverity, AlertType } from '../../domain/entities/alert.entity';
+import type {
+  AlertSeverity,
+  AlertType,
+} from '../../domain/entities/alert.entity';
 
 /**
  * Interface para o mock do QueryBuilder
@@ -594,7 +597,10 @@ describe('EmociogramaAlertRepository', () => {
 
   describe('integration: different alert types', () => {
     it('should handle all alert types correctly', () => {
-      const alertTypes: AlertType[] = ['threshold_exceeded', 'pattern_detected'];
+      const alertTypes: AlertType[] = [
+        'threshold_exceeded',
+        'pattern_detected',
+      ];
 
       for (const alertType of alertTypes) {
         const schema = createMockSchema({ alertType });
