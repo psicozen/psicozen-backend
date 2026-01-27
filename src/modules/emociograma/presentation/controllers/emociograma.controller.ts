@@ -10,7 +10,9 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -19,6 +21,7 @@ import {
   ApiParam,
   ApiHeader,
   ApiQuery,
+  ApiProduces,
 } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../../../auth/presentation/guards/supabase-auth.guard';
 import { RolesGuard } from '../../../../core/presentation/guards/roles.guard';
@@ -34,24 +37,27 @@ import {
   SubmitEmociogramaUseCase,
   GetMySubmissionsUseCase,
   GetSubmissionByIdUseCase,
+  ExportEmociogramaUseCase,
 } from '../../application/use-cases';
 import {
   SubmitEmociogramaDto,
   SubmissionResponseDto,
+  ExportQueryDto,
 } from '../../application/dtos';
 import type { EmociogramaSubmissionEntity } from '../../domain/entities/submission.entity';
 import type { MaskedSubmissionData } from '../../domain/entities/submission.entity';
 
 /**
- * Controller do Emociograma - Endpoints de Submissão
+ * Controller do Emociograma
  *
- * Gerencia as operações de submissão de estado emocional dos colaboradores.
+ * Gerencia as operações de submissão e exportação de estado emocional dos colaboradores.
  * Todos os endpoints requerem autenticação e contexto de organização.
  *
  * Endpoints:
  * - POST /emociograma - Enviar estado emocional
  * - GET /emociograma/my-submissions - Obter histórico próprio
  * - GET /emociograma/submission/:id - Obter submissão específica
+ * - GET /emociograma/export - Exportar dados (GESTOR, ADMIN)
  */
 @ApiTags('Emociograma')
 @Controller('emociograma')
@@ -67,6 +73,7 @@ export class EmociogramaController {
     private readonly submitUseCase: SubmitEmociogramaUseCase,
     private readonly getMySubmissionsUseCase: GetMySubmissionsUseCase,
     private readonly getSubmissionByIdUseCase: GetSubmissionByIdUseCase,
+    private readonly exportUseCase: ExportEmociogramaUseCase,
   ) {}
 
   /**
@@ -244,5 +251,105 @@ export class EmociogramaController {
     );
 
     return ApiResponseDto.ok(submission);
+  }
+
+  // ===========================
+  // EXPORT ENDPOINT
+  // ===========================
+
+  /**
+   * Exportar dados do emociograma
+   *
+   * Permite exportar submissões de emociograma em diferentes formatos.
+   * - GESTOR: Exporta dados da equipe (anonimizados)
+   * - ADMIN: Exporta todos os dados da organização
+   *
+   * Formatos suportados: CSV, Excel, JSON
+   */
+  @Get('export')
+  @Roles(Role.GESTOR, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Exportar dados do emociograma',
+    description:
+      'Exportar submissões para formato CSV, Excel ou JSON. ' +
+      'Gestores exportam dados da equipe (anonimizados), Admins exportam todos os dados.',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    type: String,
+    description: 'Data de início do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    type: String,
+    description: 'Data de fim do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'format',
+    required: false,
+    enum: ['csv', 'excel', 'json'],
+    description: 'Formato de exportação (padrão: csv)',
+  })
+  @ApiQuery({
+    name: 'department',
+    required: false,
+    type: String,
+    description: 'Filtrar por departamento',
+  })
+  @ApiQuery({
+    name: 'team',
+    required: false,
+    type: String,
+    description: 'Filtrar por equipe',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    type: String,
+    description: 'Filtrar por categoria de emoção',
+  })
+  @ApiProduces('text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/json')
+  @ApiResponse({
+    status: 200,
+    description: 'Arquivo exportado com sucesso',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Parâmetros inválidos ou organização não especificada',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autorizado',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Sem permissão - requer GESTOR ou ADMIN',
+  })
+  async exportData(
+    @Headers('x-organization-id') organizationId: string,
+    @Query() query: ExportQueryDto,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
+    @Res() response: Response,
+  ): Promise<void> {
+    if (!organizationId) {
+      throw new BadRequestException('Header x-organization-id é obrigatório');
+    }
+
+    const result = await this.exportUseCase.execute(
+      organizationId,
+      query,
+      userId,
+      userRole,
+    );
+
+    response.setHeader('Content-Type', result.mimeType);
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.filename}"`,
+    );
+    response.send(result.data);
   }
 }
