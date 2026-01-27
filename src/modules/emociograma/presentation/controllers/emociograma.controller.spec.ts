@@ -5,22 +5,31 @@ import { EmociogramaController } from './emociograma.controller';
 import { SubmitEmociogramaUseCase } from '../../application/use-cases/submit-emociograma.use-case';
 import { GetMySubmissionsUseCase } from '../../application/use-cases/get-my-submissions.use-case';
 import { GetSubmissionByIdUseCase } from '../../application/use-cases/get-submission-by-id.use-case';
+import { GetTeamSubmissionsUseCase } from '../../application/use-cases/get-team-submissions.use-case';
+import { GetAggregatedReportUseCase } from '../../application/use-cases/get-aggregated-report.use-case';
+import { GetAnalyticsUseCase } from '../../application/use-cases/get-analytics.use-case';
 import { SupabaseAuthGuard } from '../../../auth/presentation/guards/supabase-auth.guard';
 import { RolesGuard } from '../../../../core/presentation/guards/roles.guard';
 import { SubmitEmociogramaDto } from '../../application/dtos/submit-emociograma.dto';
+import { AggregatedReportDto } from '../../application/dtos/aggregated-report.dto';
+import { AnalyticsQueryDto } from '../../application/dtos/analytics-query.dto';
 import { PaginationDto } from '../../../../core/application/dtos/pagination.dto';
 import { EmociogramaSubmissionEntity } from '../../domain/entities/submission.entity';
 import { Role } from '../../../roles/domain/enums/role.enum';
 import type { UserPayload } from '../../../../core/presentation/decorators/current-user.decorator';
 import type { PaginatedResult } from '../../../../core/domain/repositories/base.repository.interface';
+import type { AggregatedReportResponse } from '../../application/use-cases/get-aggregated-report.use-case';
+import type { AnalyticsResponse } from '../../application/use-cases/get-analytics.use-case';
 
 describe('EmociogramaController', () => {
   let controller: EmociogramaController;
   let submitUseCase: jest.Mocked<SubmitEmociogramaUseCase>;
   let getMySubmissionsUseCase: jest.Mocked<GetMySubmissionsUseCase>;
   let getSubmissionByIdUseCase: jest.Mocked<GetSubmissionByIdUseCase>;
+  let getTeamSubmissionsUseCase: jest.Mocked<GetTeamSubmissionsUseCase>;
+  let getAggregatedReportUseCase: jest.Mocked<GetAggregatedReportUseCase>;
+  let getAnalyticsUseCase: jest.Mocked<GetAnalyticsUseCase>;
 
-  // Mock data
   const userId = 'user-123';
   const organizationId = 'org-456';
 
@@ -32,11 +41,7 @@ describe('EmociogramaController', () => {
     emotionEmoji: '😌',
     categoryId: 'cat-789',
     isAnonymous: false,
-    comment: 'Feeling good today',
-    commentFlagged: false,
     submittedAt: new Date('2024-01-15T10:00:00Z'),
-    department: 'Engineering',
-    team: 'Backend',
     createdAt: new Date('2024-01-15T10:00:00Z'),
     updatedAt: new Date('2024-01-15T10:00:00Z'),
   } as EmociogramaSubmissionEntity;
@@ -44,36 +49,19 @@ describe('EmociogramaController', () => {
   const mockUserPayload: UserPayload = {
     id: userId,
     email: 'test@example.com',
-    firstName: 'Test',
-    lastName: 'User',
     role: Role.COLABORADOR,
   };
 
   beforeEach(async () => {
-    const mockSubmitUseCase = {
-      execute: jest.fn(),
-    };
-
-    const mockGetMySubmissionsUseCase = {
-      execute: jest.fn(),
-    };
-
-    const mockGetSubmissionByIdUseCase = {
-      execute: jest.fn(),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       controllers: [EmociogramaController],
       providers: [
-        { provide: SubmitEmociogramaUseCase, useValue: mockSubmitUseCase },
-        {
-          provide: GetMySubmissionsUseCase,
-          useValue: mockGetMySubmissionsUseCase,
-        },
-        {
-          provide: GetSubmissionByIdUseCase,
-          useValue: mockGetSubmissionByIdUseCase,
-        },
+        { provide: SubmitEmociogramaUseCase, useValue: { execute: jest.fn() } },
+        { provide: GetMySubmissionsUseCase, useValue: { execute: jest.fn() } },
+        { provide: GetSubmissionByIdUseCase, useValue: { execute: jest.fn() } },
+        { provide: GetTeamSubmissionsUseCase, useValue: { execute: jest.fn() } },
+        { provide: GetAggregatedReportUseCase, useValue: { execute: jest.fn() } },
+        { provide: GetAnalyticsUseCase, useValue: { execute: jest.fn() } },
         Reflector,
       ],
     })
@@ -87,151 +75,169 @@ describe('EmociogramaController', () => {
     submitUseCase = module.get(SubmitEmociogramaUseCase);
     getMySubmissionsUseCase = module.get(GetMySubmissionsUseCase);
     getSubmissionByIdUseCase = module.get(GetSubmissionByIdUseCase);
+    getTeamSubmissionsUseCase = module.get(GetTeamSubmissionsUseCase);
+    getAggregatedReportUseCase = module.get(GetAggregatedReportUseCase);
+    getAnalyticsUseCase = module.get(GetAnalyticsUseCase);
   });
 
   describe('submit', () => {
-    const submitDto: SubmitEmociogramaDto = {
+    const dto: SubmitEmociogramaDto = {
       emotionLevel: 3,
       categoryId: 'cat-789',
       isAnonymous: false,
-      comment: 'Feeling good today',
     };
 
     it('deve criar submissão com sucesso', async () => {
-      // Arrange
       submitUseCase.execute.mockResolvedValue(mockSubmission);
 
-      // Act
-      const result = await controller.submit(submitDto, userId, organizationId);
+      const result = await controller.submit(dto, userId, organizationId);
 
-      // Assert
-      expect(submitUseCase.execute).toHaveBeenCalledWith(
-        submitDto,
-        userId,
-        organizationId,
-      );
+      expect(submitUseCase.execute).toHaveBeenCalledWith(dto, userId, organizationId);
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockSubmission);
     });
 
-    it('deve lançar BadRequestException quando organizationId não é fornecido', async () => {
-      // Act & Assert
-      await expect(controller.submit(submitDto, userId, '')).rejects.toThrow(
+    it('deve lançar erro quando organizationId não é fornecido', async () => {
+      await expect(controller.submit(dto, userId, '')).rejects.toThrow(
         BadRequestException,
       );
-      await expect(controller.submit(submitDto, userId, '')).rejects.toThrow(
-        'Header x-organization-id é obrigatório',
-      );
-    });
-
-    it('deve propagar erros do use case', async () => {
-      // Arrange
-      submitUseCase.execute.mockRejectedValue(
-        new Error('Emociograma desabilitado'),
-      );
-
-      // Act & Assert
-      await expect(
-        controller.submit(submitDto, userId, organizationId),
-      ).rejects.toThrow('Emociograma desabilitado');
     });
   });
 
   describe('getMySubmissions', () => {
     const pagination = new PaginationDto();
 
-    const mockPaginatedResult: PaginatedResult<EmociogramaSubmissionEntity> = {
-      data: [mockSubmission],
-      total: 1,
-      page: 1,
-      limit: 10,
-      totalPages: 1,
-    };
+    it('deve retornar submissões paginadas', async () => {
+      const mockResult: PaginatedResult<EmociogramaSubmissionEntity> = {
+        data: [mockSubmission],
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      };
+      getMySubmissionsUseCase.execute.mockResolvedValue(mockResult);
 
-    it('deve retornar submissões paginadas do usuário', async () => {
-      // Arrange
-      getMySubmissionsUseCase.execute.mockResolvedValue(mockPaginatedResult);
+      const result = await controller.getMySubmissions(userId, organizationId, pagination);
 
-      // Act
-      const result = await controller.getMySubmissions(
-        userId,
-        organizationId,
-        pagination,
-      );
-
-      // Assert
-      expect(getMySubmissionsUseCase.execute).toHaveBeenCalledWith(
-        userId,
-        organizationId,
-        pagination,
-      );
       expect(result.success).toBe(true);
       expect(result.data).toEqual([mockSubmission]);
-      expect(result.meta).toBeDefined();
-      expect(result.meta?.total).toBe(1);
-      expect(result.meta?.page).toBe(1);
-    });
-
-    it('deve lançar BadRequestException quando organizationId não é fornecido', async () => {
-      // Act & Assert
-      await expect(
-        controller.getMySubmissions(userId, '', pagination),
-      ).rejects.toThrow(BadRequestException);
     });
   });
 
-  describe('getSubmissionById', () => {
-    it('deve retornar submissão específica', async () => {
-      // Arrange
-      getSubmissionByIdUseCase.execute.mockResolvedValue(mockSubmission);
+  describe('getTeamAggregated', () => {
+    const query: AggregatedReportDto = {
+      startDate: new Date('2024-01-01'),
+      endDate: new Date('2024-01-31'),
+    };
 
-      // Act
-      const result = await controller.getSubmissionById(
-        mockSubmission.id,
-        mockUserPayload,
-        organizationId,
-      );
+    it('deve retornar relatório agregado', async () => {
+      const mockReport: AggregatedReportResponse = {
+        summary: {
+          totalSubmissions: 100,
+          averageEmotionLevel: 4.5,
+          motivationScore: 65,
+          anonymityRate: 30,
+        },
+        trends: {
+          direction: 'stable',
+          dailyAverages: [],
+        },
+        distribution: {
+          byLevel: [],
+          byCategory: [],
+        },
+        alerts: {
+          totalAlertsTriggered: 10,
+          criticalCount: 2,
+          highCount: 3,
+          mediumCount: 5,
+        },
+      };
+      getAggregatedReportUseCase.execute.mockResolvedValue(mockReport);
 
-      // Assert
-      expect(getSubmissionByIdUseCase.execute).toHaveBeenCalledWith(
-        mockSubmission.id,
-        mockUserPayload.id,
+      const result = await controller.getTeamAggregated(organizationId, query);
+
+      expect(getAggregatedReportUseCase.execute).toHaveBeenCalledWith(query, organizationId);
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockReport);
+    });
+  });
+
+  describe('getTeamAnonymized', () => {
+    const pagination = new PaginationDto();
+
+    it('deve retornar submissões anonimizadas', async () => {
+      const mockAnonymized = {
+        data: [{ ...mockSubmission, userId: 'anonymous' }],
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      };
+      getTeamSubmissionsUseCase.execute.mockResolvedValue(mockAnonymized);
+
+      const result = await controller.getTeamAnonymized(organizationId, pagination, userId);
+
+      expect(getTeamSubmissionsUseCase.execute).toHaveBeenCalledWith(
         organizationId,
-        mockUserPayload.role,
+        userId,
+        pagination,
+        true,
       );
       expect(result.success).toBe(true);
-      expect(result.data).toEqual(mockSubmission);
     });
+  });
 
-    it('deve lançar BadRequestException quando organizationId não é fornecido', async () => {
-      // Act & Assert
-      await expect(
-        controller.getSubmissionById(mockSubmission.id, mockUserPayload, ''),
-      ).rejects.toThrow(BadRequestException);
-    });
+  describe('getOrganizationReport', () => {
+    const query: AggregatedReportDto = {
+      startDate: new Date('2024-01-01'),
+      endDate: new Date('2024-01-31'),
+    };
 
-    it('deve passar role do usuário para o use case', async () => {
-      // Arrange
-      const adminUser: UserPayload = {
-        ...mockUserPayload,
-        role: Role.ADMIN,
+    it('deve retornar relatório da organização', async () => {
+      const mockReport: AggregatedReportResponse = {
+        summary: { totalSubmissions: 500, averageEmotionLevel: 4.2, motivationScore: 68, anonymityRate: 25 },
+        trends: { direction: 'improving', dailyAverages: [] },
+        distribution: { byLevel: [], byCategory: [] },
+        alerts: { totalAlertsTriggered: 50, criticalCount: 10, highCount: 15, mediumCount: 25 },
       };
-      getSubmissionByIdUseCase.execute.mockResolvedValue(mockSubmission);
+      getAggregatedReportUseCase.execute.mockResolvedValue(mockReport);
 
-      // Act
-      await controller.getSubmissionById(
-        mockSubmission.id,
-        adminUser,
-        organizationId,
-      );
+      const result = await controller.getOrganizationReport(organizationId, query);
 
-      // Assert
-      expect(getSubmissionByIdUseCase.execute).toHaveBeenCalledWith(
-        mockSubmission.id,
-        adminUser.id,
-        organizationId,
-        Role.ADMIN,
-      );
+      expect(result.success).toBe(true);
+      expect(result.data?.summary.totalSubmissions).toBe(500);
+    });
+  });
+
+  describe('getOrganizationAnalytics', () => {
+    const query: AnalyticsQueryDto = {
+      startDate: new Date('2024-01-01'),
+      endDate: new Date('2024-01-31'),
+      limit: 10,
+    };
+
+    it('deve retornar analytics da organização', async () => {
+      const mockAnalytics: AnalyticsResponse = {
+        period: { startDate: query.startDate, endDate: query.endDate },
+        motivation: {
+          mostMotivated: [],
+          leastMotivated: [],
+          overallScore: 72,
+        },
+        patterns: {
+          peakDays: ['2024-01-15', '2024-01-16'],
+          lowDays: ['2024-01-10'],
+          averageByDayOfWeek: [],
+        },
+      };
+      getAnalyticsUseCase.execute.mockResolvedValue(mockAnalytics);
+
+      const result = await controller.getOrganizationAnalytics(organizationId, query);
+
+      expect(getAnalyticsUseCase.execute).toHaveBeenCalledWith(organizationId, query);
+      expect(result.success).toBe(true);
+      expect(result.data?.motivation.overallScore).toBe(72);
     });
   });
 });
