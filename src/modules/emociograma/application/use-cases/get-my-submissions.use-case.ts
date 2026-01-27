@@ -10,12 +10,6 @@ import type { PaginationDto } from '../../../../core/application/dtos/pagination
  *
  * Responsável por recuperar o histórico de submissões de emociograma
  * do próprio usuário autenticado, com suporte a paginação.
- *
- * Fluxo:
- * 1. Receber userId e organizationId do contexto de autenticação
- * 2. Aplicar parâmetros de paginação
- * 3. Buscar submissões do usuário na organização
- * 4. Retornar resultado paginado
  */
 @Injectable()
 export class GetMySubmissionsUseCase {
@@ -31,7 +25,7 @@ export class GetMySubmissionsUseCase {
    *
    * @param userId - ID do usuário autenticado
    * @param organizationId - ID da organização do usuário
-   * @param pagination - Parâmetros de paginação (page, limit, sortBy, sortOrder)
+   * @param pagination - Parâmetros de paginação
    * @returns Resultado paginado com submissões do usuário
    */
   async execute(
