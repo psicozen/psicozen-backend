@@ -1,39 +1,24 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { stringify } from 'csv-stringify/sync';
-import * as ExcelJS from 'exceljs';
 import type { IEmociogramaSubmissionRepository } from '../../domain/repositories/submission.repository.interface';
 import { EMOCIOGRAMA_SUBMISSION_REPOSITORY } from '../../domain/repositories/submission.repository.interface';
+import type {
+  IExportService,
+  ExportRecord,
+  ExportResult,
+} from '../../domain/services/export.service.interface';
+import {
+  EXPORT_SERVICE,
+  ExportFormatType,
+} from '../../domain/services/export.service.interface';
 import { ExportQueryDto, ExportFormat } from '../dtos/export-query.dto';
 import { Role } from '../../../roles/domain/enums/role.enum';
 
 /**
- * Registro formatado para exportação
- */
-export interface ExportRecord {
-  Data: string;
-  'Nível Emocional': number;
-  Emoji: string;
-  Categoria: string;
-  Departamento: string;
-  Equipe: string;
-  Anônimo: string;
-  Comentário: string;
-}
-
-/**
- * Resultado da exportação
- */
-export interface ExportResult {
-  data: Buffer | string;
-  mimeType: string;
-  filename: string;
-}
-
-/**
  * Caso de Uso: Exportar Dados do Emociograma
  *
- * Responsável por gerar exportações de dados do emociograma
- * em diferentes formatos (CSV, Excel, JSON).
+ * Responsável por orquestrar a exportação de dados do emociograma.
+ * Delega a geração de arquivos para o serviço de exportação (infraestrutura),
+ * seguindo o princípio de Inversão de Dependência.
  *
  * Regras de acesso:
  * - GESTOR: Exporta apenas dados da sua equipe (anonimizados)
@@ -43,9 +28,23 @@ export interface ExportResult {
 export class ExportEmociogramaUseCase {
   private readonly logger = new Logger(ExportEmociogramaUseCase.name);
 
+  /**
+   * Tamanho do lote para processamento paginado
+   * Evita carregar todos os registros em memória de uma vez
+   */
+  private readonly BATCH_SIZE = 1000;
+
+  /**
+   * Limite máximo de registros por exportação
+   * Para volumes maiores, considerar exportação assíncrona
+   */
+  private readonly MAX_RECORDS = 50000;
+
   constructor(
     @Inject(EMOCIOGRAMA_SUBMISSION_REPOSITORY)
     private readonly submissionRepository: IEmociogramaSubmissionRepository,
+    @Inject(EXPORT_SERVICE)
+    private readonly exportService: IExportService,
   ) {}
 
   /**
@@ -55,7 +54,7 @@ export class ExportEmociogramaUseCase {
    * @param query - Parâmetros de consulta (período, filtros, formato)
    * @param userId - ID do usuário solicitante
    * @param userRole - Role do usuário (GESTOR ou ADMIN)
-   * @returns Buffer ou string com os dados exportados
+   * @returns Resultado da exportação com dados, mime type e nome do arquivo
    */
   async execute(
     organizationId: string,
@@ -63,62 +62,79 @@ export class ExportEmociogramaUseCase {
     userId: string,
     userRole: Role,
   ): Promise<ExportResult> {
+    const format = this.mapFormat(query.format);
+
     this.logger.log(
-      `Exportando dados - orgId: ${organizationId}, formato: ${query.format || ExportFormat.CSV}, período: ${query.startDate.toISOString()} - ${query.endDate.toISOString()}`,
+      `Exportando dados - orgId: ${organizationId}, formato: ${format}, período: ${query.startDate.toISOString()} - ${query.endDate.toISOString()}`,
     );
 
-    // Buscar submissões com base no papel do usuário
-    const submissions = await this.fetchSubmissions(
+    // Buscar submissões com paginação para evitar sobrecarga de memória
+    const records = await this.fetchAndFormatRecords(
       organizationId,
       query,
       userRole,
     );
 
-    // Formatar dados para exportação
-    const records = this.formatRecords(submissions);
-
     this.logger.log(`Exportando ${records.length} registros`);
 
-    // Gerar arquivo no formato solicitado
-    const format = query.format || ExportFormat.CSV;
-    return this.generateExport(records, format);
+    // Delegar geração do arquivo para o serviço de infraestrutura
+    return this.exportService.generate(records, format);
   }
 
   /**
-   * Busca submissões baseado no papel do usuário
+   * Busca e formata registros com paginação
+   * Processa em lotes para evitar sobrecarga de memória
    */
-  private async fetchSubmissions(
+  private async fetchAndFormatRecords(
     organizationId: string,
     query: ExportQueryDto,
     userRole: Role,
-  ) {
-    // Para GESTOR, filtrar apenas dados agregados/anonimizados
-    // Para ADMIN, buscar todos os dados
-    const result = await this.submissionRepository.findAll({
-      where: {
-        organizationId,
-        ...(query.department && { department: query.department }),
-        ...(query.team && { team: query.team }),
-        ...(query.categoryId && { categoryId: query.categoryId }),
-      },
-      orderBy: { submittedAt: 'DESC' },
-      // Buscar todos os registros para exportação (sem paginação)
-      take: 10000,
-      skip: 0,
-    });
+  ): Promise<ExportRecord[]> {
+    const allRecords: ExportRecord[] = [];
+    let offset = 0;
+    let hasMore = true;
 
-    // Filtrar por período
-    const filteredData = result.data.filter((sub) => {
-      const submittedAt = new Date(sub.submittedAt);
-      return submittedAt >= query.startDate && submittedAt <= query.endDate;
-    });
+    while (hasMore && allRecords.length < this.MAX_RECORDS) {
+      const result = await this.submissionRepository.findAll({
+        where: {
+          organizationId,
+          ...(query.department && { department: query.department }),
+          ...(query.team && { team: query.team }),
+          ...(query.categoryId && { categoryId: query.categoryId }),
+        },
+        orderBy: { submittedAt: 'DESC' },
+        take: this.BATCH_SIZE,
+        skip: offset,
+      });
 
-    // Para GESTOR, retornar dados mascarados
-    if (userRole === Role.GESTOR) {
-      return filteredData.map((sub) => sub.maskIdentity());
+      // Filtrar por período e formatar
+      const filteredData = result.data.filter((sub) => {
+        const submittedAt = new Date(sub.submittedAt);
+        return submittedAt >= query.startDate && submittedAt <= query.endDate;
+      });
+
+      // Para GESTOR, mascarar identidades
+      const processedData =
+        userRole === Role.GESTOR
+          ? filteredData.map((sub) => sub.maskIdentity())
+          : filteredData;
+
+      // Formatar registros
+      const formattedRecords = this.formatRecords(processedData);
+      allRecords.push(...formattedRecords);
+
+      // Verificar se há mais dados
+      hasMore = result.data.length === this.BATCH_SIZE;
+      offset += this.BATCH_SIZE;
     }
 
-    return filteredData;
+    if (allRecords.length >= this.MAX_RECORDS) {
+      this.logger.warn(
+        `Exportação limitada a ${this.MAX_RECORDS} registros. Total disponível pode ser maior.`,
+      );
+    }
+
+    return allRecords;
   }
 
   /**
@@ -149,130 +165,17 @@ export class ExportEmociogramaUseCase {
   }
 
   /**
-   * Gera o arquivo de exportação no formato especificado
+   * Mapeia formato do DTO para tipo de exportação do domínio
    */
-  private async generateExport(
-    records: ExportRecord[],
-    format: ExportFormat,
-  ): Promise<ExportResult> {
+  private mapFormat(format?: ExportFormat): ExportFormatType {
     switch (format) {
-      case ExportFormat.CSV:
-        return this.generateCSV(records);
       case ExportFormat.EXCEL:
-        return this.generateExcel(records);
+        return ExportFormatType.EXCEL;
       case ExportFormat.JSON:
+        return ExportFormatType.JSON;
+      case ExportFormat.CSV:
       default:
-        return this.generateJSON(records);
+        return ExportFormatType.CSV;
     }
-  }
-
-  /**
-   * Gera arquivo CSV
-   */
-  private generateCSV(records: ExportRecord[]): ExportResult {
-    const csv = stringify(records, {
-      header: true,
-      columns: [
-        'Data',
-        'Nível Emocional',
-        'Emoji',
-        'Categoria',
-        'Departamento',
-        'Equipe',
-        'Anônimo',
-        'Comentário',
-      ],
-    });
-
-    return {
-      data: csv,
-      mimeType: 'text/csv; charset=utf-8',
-      filename: `emociograma_${this.getDateSuffix()}.csv`,
-    };
-  }
-
-  /**
-   * Gera arquivo Excel
-   */
-  private async generateExcel(records: ExportRecord[]): Promise<ExportResult> {
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'PsicoZen';
-    workbook.created = new Date();
-
-    const worksheet = workbook.addWorksheet('Emociograma');
-
-    // Definir colunas
-    worksheet.columns = [
-      { header: 'Data', key: 'Data', width: 25 },
-      { header: 'Nível Emocional', key: 'Nível Emocional', width: 15 },
-      { header: 'Emoji', key: 'Emoji', width: 10 },
-      { header: 'Categoria', key: 'Categoria', width: 40 },
-      { header: 'Departamento', key: 'Departamento', width: 20 },
-      { header: 'Equipe', key: 'Equipe', width: 20 },
-      { header: 'Anônimo', key: 'Anônimo', width: 10 },
-      { header: 'Comentário', key: 'Comentário', width: 50 },
-    ];
-
-    // Estilizar header
-    worksheet.getRow(1).font = { bold: true };
-    worksheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF4F81BD' },
-    };
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-
-    // Adicionar dados
-    worksheet.addRows(records);
-
-    // Aplicar formatação condicional para níveis de emoção
-    for (let i = 2; i <= records.length + 1; i++) {
-      const cell = worksheet.getCell(`B${i}`);
-      const level = cell.value as number;
-
-      if (level >= 6) {
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFFFC7CE' }, // Vermelho claro para alertas
-        };
-      } else if (level <= 3) {
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFC6EFCE' }, // Verde claro para positivos
-        };
-      }
-    }
-
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    return {
-      data: Buffer.from(buffer),
-      mimeType:
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      filename: `emociograma_${this.getDateSuffix()}.xlsx`,
-    };
-  }
-
-  /**
-   * Gera arquivo JSON
-   */
-  private generateJSON(records: ExportRecord[]): ExportResult {
-    const json = JSON.stringify(records, null, 2);
-
-    return {
-      data: json,
-      mimeType: 'application/json',
-      filename: `emociograma_${this.getDateSuffix()}.json`,
-    };
-  }
-
-  /**
-   * Gera sufixo de data para nome do arquivo
-   */
-  private getDateSuffix(): string {
-    const now = new Date();
-    return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
   }
 }

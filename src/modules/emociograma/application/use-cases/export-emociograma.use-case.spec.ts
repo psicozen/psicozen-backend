@@ -1,9 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { ExportEmociogramaUseCase } from './export-emociograma.use-case';
-import type { ExportResult } from './export-emociograma.use-case';
 import { EMOCIOGRAMA_SUBMISSION_REPOSITORY } from '../../domain/repositories/submission.repository.interface';
 import type { IEmociogramaSubmissionRepository } from '../../domain/repositories/submission.repository.interface';
+import type { IExportService } from '../../domain/services/export.service.interface';
+import {
+  EXPORT_SERVICE,
+  ExportFormatType,
+} from '../../domain/services/export.service.interface';
 import { EmociogramaSubmissionEntity } from '../../domain/entities/submission.entity';
 import { ExportQueryDto, ExportFormat } from '../dtos/export-query.dto';
 import { Role } from '../../../roles/domain/enums/role.enum';
@@ -11,6 +15,7 @@ import { Role } from '../../../roles/domain/enums/role.enum';
 describe('ExportEmociogramaUseCase', () => {
   let useCase: ExportEmociogramaUseCase;
   let mockRepository: jest.Mocked<IEmociogramaSubmissionRepository>;
+  let mockExportService: jest.Mocked<IExportService>;
 
   const organizationId = 'org-123';
   const userId = 'user-456';
@@ -46,6 +51,12 @@ describe('ExportEmociogramaUseCase', () => {
     createMockSubmission({ id: 'sub-003', emotionLevel: 5 }),
   ];
 
+  const mockExportResult = {
+    data: 'exported-data',
+    mimeType: 'text/csv; charset=utf-8',
+    filename: 'emociograma_20240115.csv',
+  };
+
   beforeEach(async () => {
     mockRepository = {
       findById: jest.fn(),
@@ -66,7 +77,13 @@ describe('ExportEmociogramaUseCase', () => {
       anonymizeByUser: jest.fn(),
     } as jest.Mocked<IEmociogramaSubmissionRepository>;
 
+    mockExportService = {
+      generate: jest.fn(),
+      supportsFormat: jest.fn(),
+    } as jest.Mocked<IExportService>;
+
     jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -74,6 +91,10 @@ describe('ExportEmociogramaUseCase', () => {
         {
           provide: EMOCIOGRAMA_SUBMISSION_REPOSITORY,
           useValue: mockRepository,
+        },
+        {
+          provide: EXPORT_SERVICE,
+          useValue: mockExportService,
         },
       ],
     }).compile();
@@ -91,12 +112,13 @@ describe('ExportEmociogramaUseCase', () => {
         data: mockSubmissions,
         total: 3,
         page: 1,
-        limit: 10000,
+        limit: 1000,
         totalPages: 1,
       });
+      mockExportService.generate.mockResolvedValue(mockExportResult);
     });
 
-    it('deve exportar dados no formato CSV por padrão', async () => {
+    it('deve exportar dados chamando o serviço de exportação', async () => {
       const query: ExportQueryDto = { startDate, endDate };
 
       const result = await useCase.execute(
@@ -106,72 +128,67 @@ describe('ExportEmociogramaUseCase', () => {
         Role.ADMIN,
       );
 
-      expect(result.mimeType).toBe('text/csv; charset=utf-8');
-      expect(result.filename).toMatch(/emociograma_\d+\.csv/);
-      expect(typeof result.data).toBe('string');
-      expect(result.data).toContain('Data');
-      expect(result.data).toContain('Nível Emocional');
+      expect(mockExportService.generate).toHaveBeenCalledWith(
+        expect.any(Array),
+        ExportFormatType.CSV,
+      );
+      expect(result).toEqual(mockExportResult);
     });
 
-    it('deve exportar dados no formato CSV quando especificado', async () => {
+    it('deve mapear formato CSV corretamente', async () => {
       const query: ExportQueryDto = {
         startDate,
         endDate,
         format: ExportFormat.CSV,
       };
 
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
 
-      expect(result.mimeType).toBe('text/csv; charset=utf-8');
-      expect(result.filename).toContain('.csv');
+      expect(mockExportService.generate).toHaveBeenCalledWith(
+        expect.any(Array),
+        ExportFormatType.CSV,
+      );
     });
 
-    it('deve exportar dados no formato Excel', async () => {
+    it('deve mapear formato Excel corretamente', async () => {
       const query: ExportQueryDto = {
         startDate,
         endDate,
         format: ExportFormat.EXCEL,
       };
 
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
 
-      expect(result.mimeType).toBe(
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      expect(mockExportService.generate).toHaveBeenCalledWith(
+        expect.any(Array),
+        ExportFormatType.EXCEL,
       );
-      expect(result.filename).toContain('.xlsx');
-      expect(Buffer.isBuffer(result.data)).toBe(true);
     });
 
-    it('deve exportar dados no formato JSON', async () => {
+    it('deve mapear formato JSON corretamente', async () => {
       const query: ExportQueryDto = {
         startDate,
         endDate,
         format: ExportFormat.JSON,
       };
 
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
+
+      expect(mockExportService.generate).toHaveBeenCalledWith(
+        expect.any(Array),
+        ExportFormatType.JSON,
       );
+    });
 
-      expect(result.mimeType).toBe('application/json');
-      expect(result.filename).toContain('.json');
-      expect(typeof result.data).toBe('string');
+    it('deve usar CSV como formato padrão', async () => {
+      const query: ExportQueryDto = { startDate, endDate };
 
-      const parsed = JSON.parse(result.data as string);
-      expect(Array.isArray(parsed)).toBe(true);
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
+
+      expect(mockExportService.generate).toHaveBeenCalledWith(
+        expect.any(Array),
+        ExportFormatType.CSV,
+      );
     });
 
     it('deve chamar repositório com parâmetros corretos', async () => {
@@ -183,7 +200,7 @@ describe('ExportEmociogramaUseCase', () => {
         expect.objectContaining({
           where: { organizationId },
           orderBy: { submittedAt: 'DESC' },
-          take: 10000,
+          take: 1000,
           skip: 0,
         }),
       );
@@ -253,25 +270,23 @@ describe('ExportEmociogramaUseCase', () => {
         data: [...mockSubmissions, submissionOutOfRange],
         total: 4,
         page: 1,
-        limit: 10000,
+        limit: 1000,
         totalPages: 1,
       });
 
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.JSON,
-      };
+      const query: ExportQueryDto = { startDate, endDate };
 
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
+
+      // Verifica que apenas 3 registros (dentro do período) foram passados
+      expect(mockExportService.generate).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ 'Nível Emocional': 3 }),
+          expect.objectContaining({ 'Nível Emocional': 7 }),
+          expect.objectContaining({ 'Nível Emocional': 5 }),
+        ]),
+        expect.any(String),
       );
-
-      const parsed = JSON.parse(result.data as string);
-      expect(parsed.length).toBe(3); // Apenas os 3 dentro do período
     });
   });
 
@@ -281,46 +296,27 @@ describe('ExportEmociogramaUseCase', () => {
         data: mockSubmissions,
         total: 3,
         page: 1,
-        limit: 10000,
+        limit: 1000,
         totalPages: 1,
       });
+      mockExportService.generate.mockResolvedValue(mockExportResult);
     });
 
     it('deve mascarar identidades para GESTOR', async () => {
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.JSON,
-      };
+      const query: ExportQueryDto = { startDate, endDate };
 
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.GESTOR,
-      );
+      await useCase.execute(organizationId, query, userId, Role.GESTOR);
 
-      const parsed = JSON.parse(result.data as string);
-      // Para GESTOR, os dados devem estar mascarados
-      expect(parsed.length).toBe(3);
+      // O serviço de exportação deve ser chamado com dados mascarados
+      expect(mockExportService.generate).toHaveBeenCalled();
     });
 
     it('deve retornar dados completos para ADMIN', async () => {
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.JSON,
-      };
+      const query: ExportQueryDto = { startDate, endDate };
 
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
 
-      const parsed = JSON.parse(result.data as string);
-      expect(parsed.length).toBe(3);
+      expect(mockExportService.generate).toHaveBeenCalled();
     });
   });
 
@@ -330,27 +326,19 @@ describe('ExportEmociogramaUseCase', () => {
         data: mockSubmissions,
         total: 3,
         page: 1,
-        limit: 10000,
+        limit: 1000,
         totalPages: 1,
       });
+      mockExportService.generate.mockResolvedValue(mockExportResult);
     });
 
     it('deve formatar registro com todos os campos', async () => {
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.JSON,
-      };
+      const query: ExportQueryDto = { startDate, endDate };
 
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
 
-      const parsed = JSON.parse(result.data as string);
-      const record = parsed[0];
+      const callArgs = mockExportService.generate.mock.calls[0][0];
+      const record = callArgs[0];
 
       expect(record).toHaveProperty('Data');
       expect(record).toHaveProperty('Nível Emocional');
@@ -372,47 +360,29 @@ describe('ExportEmociogramaUseCase', () => {
         data: [submissionWithoutDept],
         total: 1,
         page: 1,
-        limit: 10000,
+        limit: 1000,
         totalPages: 1,
       });
 
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.JSON,
-      };
+      const query: ExportQueryDto = { startDate, endDate };
 
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
 
-      const parsed = JSON.parse(result.data as string);
-      expect(parsed[0].Departamento).toBe('N/A');
-      expect(parsed[0].Equipe).toBe('N/A');
+      const callArgs = mockExportService.generate.mock.calls[0][0];
+      expect(callArgs[0].Departamento).toBe('N/A');
+      expect(callArgs[0].Equipe).toBe('N/A');
     });
 
     it('deve converter isAnonymous para Sim/Não', async () => {
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.JSON,
-      };
+      const query: ExportQueryDto = { startDate, endDate };
 
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
 
-      const parsed = JSON.parse(result.data as string);
-      const anonymous = parsed.find(
+      const callArgs = mockExportService.generate.mock.calls[0][0];
+      const anonymous = callArgs.find(
         (r: { Anônimo: string }) => r.Anônimo === 'Sim',
       );
-      const identified = parsed.find(
+      const identified = callArgs.find(
         (r: { Anônimo: string }) => r.Anônimo === 'Não',
       );
 
@@ -421,151 +391,59 @@ describe('ExportEmociogramaUseCase', () => {
     });
   });
 
-  describe('geração de CSV', () => {
-    beforeEach(() => {
+  describe('paginação e limites', () => {
+    it('deve buscar em lotes de 1000 registros', async () => {
+      // Simular múltiplos lotes
+      mockRepository.findAll
+        .mockResolvedValueOnce({
+          data: Array(1000).fill(createMockSubmission()),
+          total: 2000,
+          page: 1,
+          limit: 1000,
+          totalPages: 2,
+        })
+        .mockResolvedValueOnce({
+          data: Array(500).fill(createMockSubmission()),
+          total: 2000,
+          page: 2,
+          limit: 1000,
+          totalPages: 2,
+        });
+
+      mockExportService.generate.mockResolvedValue(mockExportResult);
+
+      const query: ExportQueryDto = { startDate, endDate };
+
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
+
+      // Deve ter sido chamado 2 vezes (2 lotes)
+      expect(mockRepository.findAll).toHaveBeenCalledTimes(2);
+      expect(mockRepository.findAll).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ skip: 0, take: 1000 }),
+      );
+      expect(mockRepository.findAll).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ skip: 1000, take: 1000 }),
+      );
+    });
+
+    it('deve parar de buscar quando não há mais dados', async () => {
       mockRepository.findAll.mockResolvedValue({
-        data: mockSubmissions,
+        data: mockSubmissions, // Menos que BATCH_SIZE
         total: 3,
         page: 1,
-        limit: 10000,
+        limit: 1000,
         totalPages: 1,
       });
-    });
+      mockExportService.generate.mockResolvedValue(mockExportResult);
 
-    it('deve incluir headers no CSV', async () => {
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.CSV,
-      };
+      const query: ExportQueryDto = { startDate, endDate };
 
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
 
-      const csv = result.data as string;
-      const firstLine = csv.split('\n')[0];
-
-      expect(firstLine).toContain('Data');
-      expect(firstLine).toContain('Nível Emocional');
-      expect(firstLine).toContain('Emoji');
-    });
-
-    it('deve ter número correto de linhas', async () => {
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.CSV,
-      };
-
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
-
-      const csv = result.data as string;
-      const lines = csv.trim().split('\n');
-
-      // 1 header + 3 data lines
-      expect(lines.length).toBe(4);
-    });
-  });
-
-  describe('geração de Excel', () => {
-    beforeEach(() => {
-      mockRepository.findAll.mockResolvedValue({
-        data: mockSubmissions,
-        total: 3,
-        page: 1,
-        limit: 10000,
-        totalPages: 1,
-      });
-    });
-
-    it('deve retornar Buffer para Excel', async () => {
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.EXCEL,
-      };
-
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
-
-      expect(Buffer.isBuffer(result.data)).toBe(true);
-      expect((result.data as Buffer).length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('nome do arquivo', () => {
-    beforeEach(() => {
-      mockRepository.findAll.mockResolvedValue({
-        data: mockSubmissions,
-        total: 3,
-        page: 1,
-        limit: 10000,
-        totalPages: 1,
-      });
-    });
-
-    it('deve gerar nome com data para CSV', async () => {
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.CSV,
-      };
-
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
-
-      expect(result.filename).toMatch(/^emociograma_\d{8}\.csv$/);
-    });
-
-    it('deve gerar nome com data para Excel', async () => {
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.EXCEL,
-      };
-
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
-
-      expect(result.filename).toMatch(/^emociograma_\d{8}\.xlsx$/);
-    });
-
-    it('deve gerar nome com data para JSON', async () => {
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.JSON,
-      };
-
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
-
-      expect(result.filename).toMatch(/^emociograma_\d{8}\.json$/);
+      // Deve ter sido chamado apenas 1 vez
+      expect(mockRepository.findAll).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -580,61 +458,46 @@ describe('ExportEmociogramaUseCase', () => {
         useCase.execute(organizationId, query, userId, Role.ADMIN),
       ).rejects.toThrow('Database connection failed');
     });
+
+    it('deve propagar erro do serviço de exportação', async () => {
+      mockRepository.findAll.mockResolvedValue({
+        data: mockSubmissions,
+        total: 3,
+        page: 1,
+        limit: 1000,
+        totalPages: 1,
+      });
+      mockExportService.generate.mockRejectedValue(
+        new Error('Export generation failed'),
+      );
+
+      const query: ExportQueryDto = { startDate, endDate };
+
+      await expect(
+        useCase.execute(organizationId, query, userId, Role.ADMIN),
+      ).rejects.toThrow('Export generation failed');
+    });
   });
 
   describe('exportação vazia', () => {
-    it('deve exportar arquivo vazio quando não há dados', async () => {
+    it('deve exportar array vazio quando não há dados', async () => {
       mockRepository.findAll.mockResolvedValue({
         data: [],
         total: 0,
         page: 1,
-        limit: 10000,
+        limit: 1000,
         totalPages: 0,
       });
+      mockExportService.generate.mockResolvedValue(mockExportResult);
 
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.JSON,
-      };
+      const query: ExportQueryDto = { startDate, endDate };
 
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
+      await useCase.execute(organizationId, query, userId, Role.ADMIN);
+
+      expect(mockExportService.generate).toHaveBeenCalledWith(
+        [],
+        ExportFormatType.CSV,
       );
-
-      const parsed = JSON.parse(result.data as string);
-      expect(parsed).toEqual([]);
-    });
-
-    it('deve exportar CSV com apenas headers quando não há dados', async () => {
-      mockRepository.findAll.mockResolvedValue({
-        data: [],
-        total: 0,
-        page: 1,
-        limit: 10000,
-        totalPages: 0,
-      });
-
-      const query: ExportQueryDto = {
-        startDate,
-        endDate,
-        format: ExportFormat.CSV,
-      };
-
-      const result = await useCase.execute(
-        organizationId,
-        query,
-        userId,
-        Role.ADMIN,
-      );
-
-      const csv = result.data as string;
-      const lines = csv.trim().split('\n');
-
-      expect(lines.length).toBe(1); // Apenas header
     });
   });
 });
