@@ -309,8 +309,6 @@ export class EmociogramaController {
   @ApiQuery({ name: 'startDate', required: true, type: String })
   @ApiQuery({ name: 'endDate', required: true, type: String })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'includeDepartments', required: false, type: Boolean })
-  @ApiQuery({ name: 'includeTeams', required: false, type: Boolean })
   @ApiResponse({ status: 200, description: 'Analytics recuperados' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 403, description: 'Sem permissão - requer ADMIN' })

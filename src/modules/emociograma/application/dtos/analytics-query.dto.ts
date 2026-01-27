@@ -40,20 +40,4 @@ export class AnalyticsQueryDto {
   @Max(50)
   @Type(() => Number)
   limit?: number;
-
-  @ApiPropertyOptional({
-    description: 'Incluir análise por departamento',
-    default: false,
-  })
-  @IsOptional()
-  @Type(() => Boolean)
-  includeDepartments?: boolean;
-
-  @ApiPropertyOptional({
-    description: 'Incluir análise por equipe',
-    default: false,
-  })
-  @IsOptional()
-  @Type(() => Boolean)
-  includeTeams?: boolean;
 }

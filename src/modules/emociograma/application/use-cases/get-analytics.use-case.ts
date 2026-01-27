@@ -24,16 +24,6 @@ export interface AnalyticsResponse {
     lowDays: string[];
     averageByDayOfWeek: { dayOfWeek: number; avgLevel: number }[];
   };
-  departments?: {
-    name: string;
-    avgEmotionLevel: number;
-    totalSubmissions: number;
-  }[];
-  teams?: {
-    name: string;
-    avgEmotionLevel: number;
-    totalSubmissions: number;
-  }[];
 }
 
 /**
