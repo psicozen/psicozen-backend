@@ -328,7 +328,8 @@ export class AlertService implements IAlertService {
     }
 
     text += '\nAcesse o painel do PsicoZen para mais detalhes.\n';
-    text += '\n---\nEste email foi enviado automaticamente pelo sistema PsicoZen.';
+    text +=
+      '\n---\nEste email foi enviado automaticamente pelo sistema PsicoZen.';
 
     return text;
   }

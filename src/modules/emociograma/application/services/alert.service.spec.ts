@@ -50,7 +50,8 @@ describe('AlertService', () => {
       submissionId: 'submission-123',
       alertType: 'threshold_exceeded',
       severity: 'high',
-      message: 'Colaborador reportou estado emocional Estressado 😣 (Nível 8/10). Equipe: Backend.',
+      message:
+        'Colaborador reportou estado emocional Estressado 😣 (Nível 8/10). Equipe: Backend.',
       isResolved: false,
       notifiedUsers: [],
       createdAt: new Date(),
@@ -107,7 +108,10 @@ describe('AlertService', () => {
       providers: [
         AlertService,
         { provide: USER_REPOSITORY, useValue: mockUserRepository },
-        { provide: EMOCIOGRAMA_ALERT_REPOSITORY, useValue: mockAlertRepository },
+        {
+          provide: EMOCIOGRAMA_ALERT_REPOSITORY,
+          useValue: mockAlertRepository,
+        },
         { provide: EmailService, useValue: mockEmailService },
       ],
     }).compile();
@@ -141,17 +145,20 @@ describe('AlertService', () => {
 
         expect(result).toBeDefined();
         expect(result?.id).toBe('alert-123');
-        expect(mockUserRepository.findByRoles).toHaveBeenCalledWith(
-          'org-123',
-          [Role.GESTOR, Role.ADMIN],
-        );
+        expect(mockUserRepository.findByRoles).toHaveBeenCalledWith('org-123', [
+          Role.GESTOR,
+          Role.ADMIN,
+        ]);
         expect(mockAlertRepository.create).toHaveBeenCalled();
         expect(mockEmailService.send).toHaveBeenCalledTimes(2);
         expect(mockAlertRepository.update).toHaveBeenCalled();
       });
 
       it('should send emails with correct severity prefix for critical alerts', async () => {
-        const submission = createMockSubmission({ emotionLevel: 10, emotionEmoji: '😞' });
+        const submission = createMockSubmission({
+          emotionLevel: 10,
+          emotionEmoji: '😞',
+        });
         const savedAlert = createMockAlert({ severity: 'critical' });
 
         mockUserRepository.findByRoles.mockResolvedValue(mockManagers as any);
@@ -503,7 +510,9 @@ describe('AlertService', () => {
         const submission = createMockSubmission();
         const savedAlert = createMockAlert({ severity: severity as any });
 
-        mockUserRepository.findByRoles.mockResolvedValue([mockManagers[0]] as any);
+        mockUserRepository.findByRoles.mockResolvedValue([
+          mockManagers[0],
+        ] as any);
         mockAlertRepository.create.mockResolvedValue(savedAlert);
         mockAlertRepository.update.mockResolvedValue(savedAlert);
 
@@ -525,7 +534,9 @@ describe('AlertService', () => {
       });
       const savedAlert = createMockAlert();
 
-      mockUserRepository.findByRoles.mockResolvedValue([mockManagers[0]] as any);
+      mockUserRepository.findByRoles.mockResolvedValue([
+        mockManagers[0],
+      ] as any);
       mockAlertRepository.create.mockResolvedValue(savedAlert);
       mockAlertRepository.update.mockResolvedValue(savedAlert);
 
