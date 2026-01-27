@@ -39,8 +39,13 @@ import {
   GetSubmissionByIdUseCase,
   ExportEmociogramaUseCase,
 } from '../../application/use-cases';
+import type { AggregatedReportResponse } from '../../application/use-cases/get-aggregated-report.use-case';
+import type { AnalyticsResponse } from '../../application/use-cases/get-analytics.use-case';
+import type { AnonymizedPaginatedResult } from '../../application/use-cases/get-team-submissions.use-case';
 import {
   SubmitEmociogramaDto,
+  AggregatedReportDto,
+  AnalyticsQueryDto,
   SubmissionResponseDto,
   ExportQueryDto,
 } from '../../application/dtos';
@@ -76,12 +81,12 @@ export class EmociogramaController {
     private readonly exportUseCase: ExportEmociogramaUseCase,
   ) {}
 
+  // ===========================
+  // SUBMISSION ENDPOINTS
+  // ===========================
+
   /**
    * Enviar estado emocional diário
-   *
-   * Permite que colaboradores enviem seu estado emocional diário.
-   * Dispara alertas automaticamente se o nível de emoção for >= 6.
-   * Suporta submissões anônimas para maior privacidade.
    */
   @Post()
   @Roles(Role.COLABORADOR, Role.GESTOR, Role.ADMIN)
@@ -90,25 +95,16 @@ export class EmociogramaController {
     summary: 'Enviar estado emocional diário',
     description:
       'Colaboradores enviam seu estado emocional diário com anonimato opcional. ' +
-      'Dispara alertas automaticamente se nível de emoção >= 6 (emoções negativas).',
+      'Dispara alertas automaticamente se nível de emoção >= 6.',
   })
   @ApiResponse({
     status: 201,
     description: 'Submissão criada com sucesso',
     type: SubmissionResponseDto,
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Dados inválidos ou organização não especificada',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Não autorizado - Token inválido ou ausente',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Emociograma desabilitado para esta organização',
-  })
+  @ApiResponse({ status: 400, description: 'Dados inválidos' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 403, description: 'Emociograma desabilitado' })
   async submit(
     @Body() dto: SubmitEmociogramaDto,
     @CurrentUser('id') userId: string,
@@ -116,9 +112,7 @@ export class EmociogramaController {
   ): Promise<
     ApiResponseDto<EmociogramaSubmissionEntity | MaskedSubmissionData>
   > {
-    if (!organizationId) {
-      throw new BadRequestException('Header x-organization-id é obrigatório');
-    }
+    this.validateOrganizationId(organizationId);
 
     const submission = await this.submitUseCase.execute(
       dto,
@@ -131,49 +125,23 @@ export class EmociogramaController {
 
   /**
    * Obter histórico de submissões do próprio usuário
-   *
-   * Retorna lista paginada das submissões de emociograma do usuário autenticado.
-   * Ordenado por data de submissão (mais recentes primeiro).
    */
   @Get('my-submissions')
   @Roles(Role.COLABORADOR, Role.GESTOR, Role.ADMIN)
   @ApiOperation({
     summary: 'Obter meu histórico de submissões',
-    description:
-      'Recupera lista paginada de submissões emocionais próprias do usuário autenticado.',
+    description: 'Recupera lista paginada de submissões emocionais próprias.',
   })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Número da página (padrão: 1)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Itens por página (padrão: 10, máx: 100)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Submissões recuperadas com sucesso',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Organização não especificada',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Não autorizado',
-  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Submissões recuperadas' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
   async getMySubmissions(
     @CurrentUser('id') userId: string,
     @Headers('x-organization-id') organizationId: string,
     @Query() pagination: PaginationDto,
   ): Promise<ApiResponseDto<EmociogramaSubmissionEntity[]>> {
-    if (!organizationId) {
-      throw new BadRequestException('Header x-organization-id é obrigatório');
-    }
+    this.validateOrganizationId(organizationId);
 
     const result = await this.getMySubmissionsUseCase.execute(
       userId,
@@ -191,47 +159,18 @@ export class EmociogramaController {
 
   /**
    * Obter submissão específica por ID
-   *
-   * Recupera uma submissão específica. Controle de acesso:
-   * - COLABORADOR: Só pode ver suas próprias submissões
-   * - GESTOR/ADMIN: Pode ver qualquer submissão da organização
-   *
-   * Para submissões anônimas de outros usuários, retorna dados mascarados.
    */
   @Get('submission/:id')
   @Roles(Role.COLABORADOR, Role.GESTOR, Role.ADMIN)
   @ApiOperation({
     summary: 'Obter submissão específica por ID',
     description:
-      'Recupera uma submissão específica. Colaboradores só podem ver suas próprias submissões. ' +
-      'Gestores e admins podem ver qualquer submissão (dados mascarados se anônima).',
+      'Colaboradores só podem ver suas próprias. Gestores/admins veem todas (mascaradas se anônimas).',
   })
-  @ApiParam({
-    name: 'id',
-    description: 'ID da submissão (UUID)',
-    type: String,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Submissão recuperada com sucesso',
-    type: SubmissionResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Organização não especificada',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Não autorizado',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Sem permissão para ver esta submissão',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Submissão não encontrada',
-  })
+  @ApiParam({ name: 'id', description: 'ID da submissão (UUID)' })
+  @ApiResponse({ status: 200, description: 'Submissão recuperada' })
+  @ApiResponse({ status: 403, description: 'Sem permissão' })
+  @ApiResponse({ status: 404, description: 'Não encontrada' })
   async getSubmissionById(
     @Param('id') id: string,
     @CurrentUser() user: UserPayload,
@@ -239,9 +178,7 @@ export class EmociogramaController {
   ): Promise<
     ApiResponseDto<EmociogramaSubmissionEntity | MaskedSubmissionData>
   > {
-    if (!organizationId) {
-      throw new BadRequestException('Header x-organization-id é obrigatório');
-    }
+    this.validateOrganizationId(organizationId);
 
     const submission = await this.getSubmissionByIdUseCase.execute(
       id,
