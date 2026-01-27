@@ -7,5 +7,3 @@ export * from './analytics-query.dto';
 
 // Output DTOs (Response)
 export * from './submission-response.dto';
-export * from './alert-response.dto';
-export * from './category-response.dto';
