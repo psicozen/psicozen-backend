@@ -13,3 +13,6 @@ export * from './export-emociograma.use-case';
 
 // Alert Use Cases
 export * from './get-alert-dashboard.use-case';
+export * from './resolve-alert.use-case';
+export * from './list-alerts.use-case';
+export * from './get-alert-by-id.use-case';
