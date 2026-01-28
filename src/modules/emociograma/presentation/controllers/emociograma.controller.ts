@@ -38,6 +38,9 @@ import {
   GetMySubmissionsUseCase,
   GetSubmissionByIdUseCase,
   ExportEmociogramaUseCase,
+  GetTeamSubmissionsUseCase,
+  GetAggregatedReportUseCase,
+  GetAnalyticsUseCase,
 } from '../../application/use-cases';
 import type { AggregatedReportResponse } from '../../application/use-cases/get-aggregated-report.use-case';
 import type { AnalyticsResponse } from '../../application/use-cases/get-analytics.use-case';
@@ -62,6 +65,10 @@ import type { MaskedSubmissionData } from '../../domain/entities/submission.enti
  * - POST /emociograma - Enviar estado emocional
  * - GET /emociograma/my-submissions - Obter histórico próprio
  * - GET /emociograma/submission/:id - Obter submissão específica
+ * - GET /emociograma/team/aggregated - Relatório agregado da equipe (GESTOR, ADMIN)
+ * - GET /emociograma/team/anonymized - Submissões anonimizadas (GESTOR, ADMIN)
+ * - GET /emociograma/organization/report - Relatório da organização (ADMIN)
+ * - GET /emociograma/organization/analytics - Analytics avançado (ADMIN)
  * - GET /emociograma/export - Exportar dados (GESTOR, ADMIN)
  */
 @ApiTags('Emociograma')
@@ -79,7 +86,19 @@ export class EmociogramaController {
     private readonly getMySubmissionsUseCase: GetMySubmissionsUseCase,
     private readonly getSubmissionByIdUseCase: GetSubmissionByIdUseCase,
     private readonly exportUseCase: ExportEmociogramaUseCase,
+    private readonly getTeamSubmissionsUseCase: GetTeamSubmissionsUseCase,
+    private readonly getAggregatedReportUseCase: GetAggregatedReportUseCase,
+    private readonly getAnalyticsUseCase: GetAnalyticsUseCase,
   ) {}
+
+  /**
+   * Valida se o organizationId foi fornecido
+   */
+  private validateOrganizationId(organizationId: string): void {
+    if (!organizationId) {
+      throw new BadRequestException('Header x-organization-id é obrigatório');
+    }
+  }
 
   // ===========================
   // SUBMISSION ENDPOINTS
@@ -188,6 +207,183 @@ export class EmociogramaController {
     );
 
     return ApiResponseDto.ok(submission);
+  }
+
+  // ===========================
+  // REPORT ENDPOINTS
+  // ===========================
+
+  /**
+   * Obter relatório agregado da equipe
+   *
+   * Gera estatísticas agregadas incluindo totais, médias, tendências e distribuições.
+   */
+  @Get('team/aggregated')
+  @Roles(Role.GESTOR, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Obter relatório agregado da equipe',
+    description:
+      'Gera estatísticas agregadas das submissões da equipe incluindo ' +
+      'totais, médias, tendências e distribuição por categoria.',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    type: String,
+    description: 'Data de início do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    type: String,
+    description: 'Data de fim do período (ISO 8601)',
+  })
+  @ApiQuery({ name: 'department', required: false, type: String })
+  @ApiQuery({ name: 'team', required: false, type: String })
+  @ApiQuery({ name: 'categoryId', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'Relatório agregado retornado' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 403, description: 'Sem permissão - requer GESTOR ou ADMIN' })
+  async getTeamAggregated(
+    @Headers('x-organization-id') organizationId: string,
+    @Query() query: AggregatedReportDto,
+  ): Promise<ApiResponseDto<AggregatedReportResponse>> {
+    this.validateOrganizationId(organizationId);
+
+    const report = await this.getAggregatedReportUseCase.execute(
+      query,
+      organizationId,
+    );
+
+    return ApiResponseDto.ok(report);
+  }
+
+  /**
+   * Obter submissões anonimizadas da equipe
+   *
+   * Retorna lista paginada de submissões com dados pessoais mascarados.
+   */
+  @Get('team/anonymized')
+  @Roles(Role.GESTOR, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Obter submissões anonimizadas da equipe',
+    description:
+      'Retorna lista paginada de submissões da equipe com dados ' +
+      'pessoais mascarados para preservar privacidade.',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Submissões anonimizadas retornadas' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 403, description: 'Sem permissão - requer GESTOR ou ADMIN' })
+  async getTeamAnonymized(
+    @Headers('x-organization-id') organizationId: string,
+    @Query() pagination: PaginationDto,
+    @CurrentUser('id') userId: string,
+  ): Promise<ApiResponseDto<AnonymizedPaginatedResult>> {
+    this.validateOrganizationId(organizationId);
+
+    const result = await this.getTeamSubmissionsUseCase.execute(
+      organizationId,
+      userId,
+      pagination,
+      true, // anonymize
+    );
+
+    return ApiResponseDto.ok(result as AnonymizedPaginatedResult);
+  }
+
+  /**
+   * Obter relatório completo da organização
+   *
+   * Disponível apenas para ADMIN. Retorna estatísticas de toda a organização.
+   */
+  @Get('organization/report')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Obter relatório da organização',
+    description:
+      'Gera relatório completo com estatísticas de toda a organização. ' +
+      'Disponível apenas para administradores.',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    type: String,
+    description: 'Data de início do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    type: String,
+    description: 'Data de fim do período (ISO 8601)',
+  })
+  @ApiQuery({ name: 'department', required: false, type: String })
+  @ApiQuery({ name: 'team', required: false, type: String })
+  @ApiQuery({ name: 'categoryId', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'Relatório da organização retornado' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 403, description: 'Sem permissão - requer ADMIN' })
+  async getOrganizationReport(
+    @Headers('x-organization-id') organizationId: string,
+    @Query() query: AggregatedReportDto,
+  ): Promise<ApiResponseDto<AggregatedReportResponse>> {
+    this.validateOrganizationId(organizationId);
+
+    const report = await this.getAggregatedReportUseCase.execute(
+      query,
+      organizationId,
+    );
+
+    return ApiResponseDto.ok(report);
+  }
+
+  /**
+   * Obter analytics avançado da organização
+   *
+   * Disponível apenas para ADMIN. Retorna analytics com padrões e insights.
+   */
+  @Get('organization/analytics')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Obter analytics da organização',
+    description:
+      'Gera analytics avançado incluindo colaboradores mais/menos motivados, ' +
+      'padrões temporais e análises por período. Disponível apenas para administradores.',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    type: String,
+    description: 'Data de início do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    type: String,
+    description: 'Data de fim do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Limite de resultados para listas (padrão: 10)',
+  })
+  @ApiResponse({ status: 200, description: 'Analytics retornado' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 403, description: 'Sem permissão - requer ADMIN' })
+  async getOrganizationAnalytics(
+    @Headers('x-organization-id') organizationId: string,
+    @Query() query: AnalyticsQueryDto,
+  ): Promise<ApiResponseDto<AnalyticsResponse>> {
+    this.validateOrganizationId(organizationId);
+
+    const analytics = await this.getAnalyticsUseCase.execute(
+      organizationId,
+      query,
+    );
+
+    return ApiResponseDto.ok(analytics);
   }
 
   // ===========================

@@ -6,9 +6,16 @@ import { SubmitEmociogramaUseCase } from '../../application/use-cases/submit-emo
 import { GetMySubmissionsUseCase } from '../../application/use-cases/get-my-submissions.use-case';
 import { GetSubmissionByIdUseCase } from '../../application/use-cases/get-submission-by-id.use-case';
 import { ExportEmociogramaUseCase } from '../../application/use-cases/export-emociograma.use-case';
+import { GetTeamSubmissionsUseCase } from '../../application/use-cases/get-team-submissions.use-case';
+import { GetAggregatedReportUseCase } from '../../application/use-cases/get-aggregated-report.use-case';
+import type { AggregatedReportResponse } from '../../application/use-cases/get-aggregated-report.use-case';
+import { GetAnalyticsUseCase } from '../../application/use-cases/get-analytics.use-case';
+import type { AnalyticsResponse } from '../../application/use-cases/get-analytics.use-case';
 import { SupabaseAuthGuard } from '../../../auth/presentation/guards/supabase-auth.guard';
 import { RolesGuard } from '../../../../core/presentation/guards/roles.guard';
 import { SubmitEmociogramaDto } from '../../application/dtos/submit-emociograma.dto';
+import { AggregatedReportDto } from '../../application/dtos/aggregated-report.dto';
+import { AnalyticsQueryDto } from '../../application/dtos/analytics-query.dto';
 import { ExportQueryDto, ExportFormat } from '../../application/dtos/export-query.dto';
 import { PaginationDto } from '../../../../core/application/dtos/pagination.dto';
 import { EmociogramaSubmissionEntity } from '../../domain/entities/submission.entity';
@@ -23,6 +30,9 @@ describe('EmociogramaController', () => {
   let getMySubmissionsUseCase: jest.Mocked<GetMySubmissionsUseCase>;
   let getSubmissionByIdUseCase: jest.Mocked<GetSubmissionByIdUseCase>;
   let exportUseCase: jest.Mocked<ExportEmociogramaUseCase>;
+  let getTeamSubmissionsUseCase: jest.Mocked<GetTeamSubmissionsUseCase>;
+  let getAggregatedReportUseCase: jest.Mocked<GetAggregatedReportUseCase>;
+  let getAnalyticsUseCase: jest.Mocked<GetAnalyticsUseCase>;
 
   const userId = 'user-123';
   const organizationId = 'org-456';
@@ -63,6 +73,18 @@ describe('EmociogramaController', () => {
       execute: jest.fn(),
     };
 
+    const mockGetTeamSubmissionsUseCase = {
+      execute: jest.fn(),
+    };
+
+    const mockGetAggregatedReportUseCase = {
+      execute: jest.fn(),
+    };
+
+    const mockGetAnalyticsUseCase = {
+      execute: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [EmociogramaController],
       providers: [
@@ -79,6 +101,18 @@ describe('EmociogramaController', () => {
           provide: ExportEmociogramaUseCase,
           useValue: mockExportUseCase,
         },
+        {
+          provide: GetTeamSubmissionsUseCase,
+          useValue: mockGetTeamSubmissionsUseCase,
+        },
+        {
+          provide: GetAggregatedReportUseCase,
+          useValue: mockGetAggregatedReportUseCase,
+        },
+        {
+          provide: GetAnalyticsUseCase,
+          useValue: mockGetAnalyticsUseCase,
+        },
         Reflector,
       ],
     })
@@ -93,6 +127,9 @@ describe('EmociogramaController', () => {
     getMySubmissionsUseCase = module.get(GetMySubmissionsUseCase);
     getSubmissionByIdUseCase = module.get(GetSubmissionByIdUseCase);
     exportUseCase = module.get(ExportEmociogramaUseCase);
+    getTeamSubmissionsUseCase = module.get(GetTeamSubmissionsUseCase);
+    getAggregatedReportUseCase = module.get(GetAggregatedReportUseCase);
+    getAnalyticsUseCase = module.get(GetAnalyticsUseCase);
   });
 
   describe('submit', () => {
