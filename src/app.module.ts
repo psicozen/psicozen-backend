@@ -9,6 +9,7 @@ import { validationSchema } from './config/env.validation';
 import { getDatabaseConfig } from './config/database.config';
 
 // Core
+import { CoreModule } from './core/core.module';
 import { SupabaseModule } from './core/infrastructure/supabase/supabase.module';
 import { AllExceptionsFilter } from './core/presentation/filters/http-exception.filter';
 
@@ -54,6 +55,7 @@ import { AppService } from './app.service';
     ]),
 
     // Core Modules
+    CoreModule,
     SupabaseModule,
 
     // Feature Modules

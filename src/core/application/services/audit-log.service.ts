@@ -1,75 +1,139 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { Injectable, Inject, Logger } from '@nestjs/common';
+import { AuditLogEntity } from '../../domain/entities/audit-log.entity';
+import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository.interface';
+import type { IAuditLogRepository } from '../../domain/repositories/audit-log.repository.interface';
 import type {
   IAuditLogService,
   AuditLogEntry,
-  AuditLogResult,
+  AuditTrailOptions,
+  AuditTrailResult,
+  CleanupResult,
 } from './audit-log.service.interface';
 
 /**
  * Implementação do Serviço de Log de Auditoria
  *
- * Esta implementação utiliza o Logger do NestJS para registrar eventos de auditoria.
- * Em produção, pode ser substituída por uma implementação que persiste em banco de dados
- * ou envia para um serviço de logging centralizado (ex: CloudWatch, Datadog, ELK).
+ * Orquestra operações de auditoria delegando persistência ao repositório.
+ * Segue Clean Architecture - depende apenas de interfaces da camada Domain.
  *
  * Funcionalidades:
- * - Registro estruturado de eventos LGPD (anonimização, exportação, exclusão)
- * - Geração de IDs únicos para rastreabilidade
- * - Log em formato JSON para fácil parsing e análise
+ * - Registro de eventos de auditoria
+ * - Consulta de trilha de auditoria por usuário
+ * - Consulta por tipo de ação
+ * - Limpeza automática de logs antigos (retenção de 2 anos)
  */
 @Injectable()
 export class AuditLogService implements IAuditLogService {
-  private readonly logger = new Logger('AuditLog');
+  private readonly logger = new Logger(AuditLogService.name);
+
+  /** Período de retenção em anos (conforme LGPD) */
+  private readonly RETENTION_YEARS = 2;
+
+  constructor(
+    @Inject(AUDIT_LOG_REPOSITORY)
+    private readonly auditLogRepository: IAuditLogRepository,
+  ) {}
 
   /**
-   * Registrar um evento de auditoria
-   *
-   * @param entry - Dados do evento a ser registrado
-   * @returns Resultado da operação de log
+   * Registrar uma ação na trilha de auditoria
    */
-  async log(entry: AuditLogEntry): Promise<AuditLogResult> {
-    const id = randomUUID();
-    const timestamp = new Date();
-
-    const logData = {
-      id,
-      timestamp: timestamp.toISOString(),
+  async log(entry: AuditLogEntry): Promise<AuditLogEntity> {
+    const entity = AuditLogEntity.create({
       action: entry.action,
       userId: entry.userId,
       organizationId: entry.organizationId,
       performedBy: entry.performedBy,
+      metadata: entry.metadata,
       ipAddress: entry.ipAddress,
       userAgent: entry.userAgent,
-      metadata: entry.metadata,
-    };
+    });
 
-    // Log em formato estruturado para fácil análise
-    this.logger.log(JSON.stringify(logData));
+    const saved = await this.auditLogRepository.create(entity);
 
-    // Log adicional para ações LGPD (mais visibilidade)
-    if (this.isLgpdAction(entry.action)) {
+    // Log adicional para ações LGPD
+    if (saved.isLgpdAction()) {
       this.logger.warn(
-        `LGPD Action: ${entry.action} - User: ${entry.userId} - Org: ${entry.organizationId}`,
+        `LGPD Action Logged: ${entry.action} - User: ${entry.userId} - Org: ${entry.organizationId || 'N/A'}`,
       );
     }
 
+    this.logger.debug(`Audit log created: ${saved.id} - Action: ${saved.action}`);
+
+    return saved;
+  }
+
+  /**
+   * Obter trilha de auditoria para um usuário
+   */
+  async getAuditTrail(
+    userId: string,
+    organizationId?: string,
+    options?: AuditTrailOptions,
+  ): Promise<AuditTrailResult> {
+    const result = await this.auditLogRepository.findByUser(
+      userId,
+      organizationId,
+      {
+        action: options?.action,
+        startDate: options?.startDate,
+        endDate: options?.endDate,
+        limit: options?.limit,
+        offset: options?.offset,
+      },
+    );
+
     return {
-      id,
-      timestamp,
-      success: true,
+      data: result.data,
+      total: result.total,
     };
   }
 
   /**
-   * Verifica se a ação é relacionada a LGPD
+   * Obter trilha de auditoria por ação
    */
-  private isLgpdAction(action: string): boolean {
-    const lgpdActions = [
-      'user_data_anonymized',
-      'user_data_exported',
-      'user_data_deleted',
-    ];
-    return lgpdActions.includes(action);
+  async getByAction(
+    action: string,
+    organizationId?: string,
+    options?: AuditTrailOptions,
+  ): Promise<AuditTrailResult> {
+    const result = await this.auditLogRepository.findByAction(
+      action,
+      organizationId,
+      {
+        startDate: options?.startDate,
+        endDate: options?.endDate,
+        limit: options?.limit,
+        offset: options?.offset,
+      },
+    );
+
+    return {
+      data: result.data,
+      total: result.total,
+    };
+  }
+
+  /**
+   * Limpar logs antigos (política de retenção de 2 anos)
+   *
+   * IMPORTANTE: Este método deve ser executado via cron job
+   * para manter conformidade LGPD e gerenciar armazenamento.
+   */
+  async cleanupOldLogs(): Promise<CleanupResult> {
+    const retentionDate = new Date();
+    retentionDate.setFullYear(retentionDate.getFullYear() - this.RETENTION_YEARS);
+
+    const deletedCount = await this.auditLogRepository.deleteOlderThan(retentionDate);
+
+    if (deletedCount > 0) {
+      this.logger.log(
+        `Audit log cleanup completed: ${deletedCount} records removed (retention date: ${retentionDate.toISOString()})`,
+      );
+    }
+
+    return {
+      deletedCount,
+      retentionDate,
+    };
   }
 }
