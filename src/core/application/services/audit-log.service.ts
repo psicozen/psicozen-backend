@@ -1,8 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, Between } from 'typeorm';
-import { AuditLogSchema } from '../../infrastructure/persistence/audit-log.schema';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { AuditLogEntity } from '../../domain/entities/audit-log.entity';
+import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository.interface';
+import type { IAuditLogRepository } from '../../domain/repositories/audit-log.repository.interface';
 import type {
   IAuditLogService,
   AuditLogEntry,
@@ -14,9 +13,8 @@ import type {
 /**
  * Implementação do Serviço de Log de Auditoria
  *
- * Persiste eventos de auditoria no banco de dados PostgreSQL.
- * Essencial para conformidade LGPD, registrando todas as operações
- * relacionadas a dados pessoais.
+ * Orquestra operações de auditoria delegando persistência ao repositório.
+ * Segue Clean Architecture - depende apenas de interfaces da camada Domain.
  *
  * Funcionalidades:
  * - Registro de eventos de auditoria
@@ -31,33 +29,29 @@ export class AuditLogService implements IAuditLogService {
   /** Período de retenção em anos (conforme LGPD) */
   private readonly RETENTION_YEARS = 2;
 
-  /** Limite padrão para consultas */
-  private readonly DEFAULT_LIMIT = 100;
-
   constructor(
-    @InjectRepository(AuditLogSchema)
-    private readonly auditLogRepository: Repository<AuditLogSchema>,
+    @Inject(AUDIT_LOG_REPOSITORY)
+    private readonly auditLogRepository: IAuditLogRepository,
   ) {}
 
   /**
    * Registrar uma ação na trilha de auditoria
    */
   async log(entry: AuditLogEntry): Promise<AuditLogEntity> {
-    const schema = this.auditLogRepository.create({
+    const entity = AuditLogEntity.create({
       action: entry.action,
       userId: entry.userId,
-      organizationId: entry.organizationId ?? null,
-      performedBy: entry.performedBy ?? null,
-      metadata: entry.metadata || {},
-      ipAddress: entry.ipAddress ?? null,
-      userAgent: entry.userAgent ?? null,
-      createdAt: new Date(),
+      organizationId: entry.organizationId,
+      performedBy: entry.performedBy,
+      metadata: entry.metadata,
+      ipAddress: entry.ipAddress,
+      userAgent: entry.userAgent,
     });
 
-    const saved = await this.auditLogRepository.save(schema);
+    const saved = await this.auditLogRepository.create(entity);
 
     // Log adicional para ações LGPD
-    if (this.isLgpdAction(entry.action)) {
+    if (saved.isLgpdAction()) {
       this.logger.warn(
         `LGPD Action Logged: ${entry.action} - User: ${entry.userId} - Org: ${entry.organizationId || 'N/A'}`,
       );
@@ -65,7 +59,7 @@ export class AuditLogService implements IAuditLogService {
 
     this.logger.debug(`Audit log created: ${saved.id} - Action: ${saved.action}`);
 
-    return this.toDomain(saved);
+    return saved;
   }
 
   /**
@@ -76,30 +70,21 @@ export class AuditLogService implements IAuditLogService {
     organizationId?: string,
     options?: AuditTrailOptions,
   ): Promise<AuditTrailResult> {
-    const queryBuilder = this.auditLogRepository
-      .createQueryBuilder('audit_logs')
-      .where('audit_logs.user_id = :userId', { userId });
-
-    if (organizationId) {
-      queryBuilder.andWhere('audit_logs.organization_id = :organizationId', {
-        organizationId,
-      });
-    }
-
-    // Aplicar filtros opcionais
-    this.applyFilters(queryBuilder, options);
-
-    // Ordenar e paginar
-    queryBuilder
-      .orderBy('audit_logs.created_at', 'DESC')
-      .take(options?.limit ?? this.DEFAULT_LIMIT)
-      .skip(options?.offset ?? 0);
-
-    const [schemas, total] = await queryBuilder.getManyAndCount();
+    const result = await this.auditLogRepository.findByUser(
+      userId,
+      organizationId,
+      {
+        action: options?.action,
+        startDate: options?.startDate,
+        endDate: options?.endDate,
+        limit: options?.limit,
+        offset: options?.offset,
+      },
+    );
 
     return {
-      data: schemas.map((s) => this.toDomain(s)),
-      total,
+      data: result.data,
+      total: result.total,
     };
   }
 
@@ -111,30 +96,20 @@ export class AuditLogService implements IAuditLogService {
     organizationId?: string,
     options?: AuditTrailOptions,
   ): Promise<AuditTrailResult> {
-    const queryBuilder = this.auditLogRepository
-      .createQueryBuilder('audit_logs')
-      .where('audit_logs.action = :action', { action });
-
-    if (organizationId) {
-      queryBuilder.andWhere('audit_logs.organization_id = :organizationId', {
-        organizationId,
-      });
-    }
-
-    // Aplicar filtros opcionais
-    this.applyFilters(queryBuilder, options);
-
-    // Ordenar e paginar
-    queryBuilder
-      .orderBy('audit_logs.created_at', 'DESC')
-      .take(options?.limit ?? this.DEFAULT_LIMIT)
-      .skip(options?.offset ?? 0);
-
-    const [schemas, total] = await queryBuilder.getManyAndCount();
+    const result = await this.auditLogRepository.findByAction(
+      action,
+      organizationId,
+      {
+        startDate: options?.startDate,
+        endDate: options?.endDate,
+        limit: options?.limit,
+        offset: options?.offset,
+      },
+    );
 
     return {
-      data: schemas.map((s) => this.toDomain(s)),
-      total,
+      data: result.data,
+      total: result.total,
     };
   }
 
@@ -148,14 +123,7 @@ export class AuditLogService implements IAuditLogService {
     const retentionDate = new Date();
     retentionDate.setFullYear(retentionDate.getFullYear() - this.RETENTION_YEARS);
 
-    const result = await this.auditLogRepository
-      .createQueryBuilder()
-      .delete()
-      .from(AuditLogSchema)
-      .where('created_at < :retentionDate', { retentionDate })
-      .execute();
-
-    const deletedCount = result.affected ?? 0;
+    const deletedCount = await this.auditLogRepository.deleteOlderThan(retentionDate);
 
     if (deletedCount > 0) {
       this.logger.log(
@@ -167,66 +135,5 @@ export class AuditLogService implements IAuditLogService {
       deletedCount,
       retentionDate,
     };
-  }
-
-  /**
-   * Aplicar filtros opcionais ao query builder
-   */
-  private applyFilters(
-    queryBuilder: ReturnType<typeof this.auditLogRepository.createQueryBuilder>,
-    options?: AuditTrailOptions,
-  ): void {
-    if (options?.action) {
-      queryBuilder.andWhere('audit_logs.action = :filterAction', {
-        filterAction: options.action,
-      });
-    }
-
-    if (options?.startDate && options?.endDate) {
-      queryBuilder.andWhere(
-        'audit_logs.created_at BETWEEN :startDate AND :endDate',
-        {
-          startDate: options.startDate,
-          endDate: options.endDate,
-        },
-      );
-    } else if (options?.startDate) {
-      queryBuilder.andWhere('audit_logs.created_at >= :startDate', {
-        startDate: options.startDate,
-      });
-    } else if (options?.endDate) {
-      queryBuilder.andWhere('audit_logs.created_at <= :endDate', {
-        endDate: options.endDate,
-      });
-    }
-  }
-
-  /**
-   * Verifica se a ação é relacionada a LGPD
-   */
-  private isLgpdAction(action: string): boolean {
-    const lgpdActions = [
-      'user_data_anonymized',
-      'user_data_exported',
-      'user_data_deleted',
-    ];
-    return lgpdActions.includes(action);
-  }
-
-  /**
-   * Converte schema do banco para entidade de domínio
-   */
-  private toDomain(schema: AuditLogSchema): AuditLogEntity {
-    return new AuditLogEntity({
-      id: schema.id,
-      action: schema.action,
-      userId: schema.userId,
-      organizationId: schema.organizationId ?? undefined,
-      performedBy: schema.performedBy ?? undefined,
-      metadata: schema.metadata,
-      ipAddress: schema.ipAddress ?? undefined,
-      userAgent: schema.userAgent ?? undefined,
-      createdAt: schema.createdAt,
-    });
   }
 }

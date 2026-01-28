@@ -1,57 +1,47 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder, DeleteQueryBuilder } from 'typeorm';
 import { AuditLogService } from './audit-log.service';
-import { AuditLogSchema } from '../../infrastructure/persistence/audit-log.schema';
+import { AuditLogEntity } from '../../domain/entities/audit-log.entity';
+import {
+  AUDIT_LOG_REPOSITORY,
+  type IAuditLogRepository,
+} from '../../domain/repositories/audit-log.repository.interface';
 import type { AuditLogEntry } from './audit-log.service.interface';
 
 describe('AuditLogService', () => {
   let service: AuditLogService;
-  let repository: jest.Mocked<Repository<AuditLogSchema>>;
+  let mockRepository: jest.Mocked<IAuditLogRepository>;
 
-  const mockSchema: AuditLogSchema = {
+  const mockEntity = new AuditLogEntity({
     id: 'log-001',
     action: 'user_data_exported',
     userId: 'user-001',
     organizationId: 'org-001',
-    performedBy: null,
+    performedBy: undefined,
     metadata: { reason: 'LGPD_compliance' },
     ipAddress: '192.168.1.1',
     userAgent: 'Mozilla/5.0',
     createdAt: new Date('2024-01-15'),
-  };
-
-  const mockQueryBuilder = {
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    orderBy: jest.fn().mockReturnThis(),
-    take: jest.fn().mockReturnThis(),
-    skip: jest.fn().mockReturnThis(),
-    getManyAndCount: jest.fn(),
-    delete: jest.fn().mockReturnThis(),
-    from: jest.fn().mockReturnThis(),
-    execute: jest.fn(),
-  } as unknown as jest.Mocked<SelectQueryBuilder<AuditLogSchema>>;
+  });
 
   beforeEach(async () => {
-    const mockRepository = {
+    mockRepository = {
       create: jest.fn(),
-      save: jest.fn(),
-      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+      findByUser: jest.fn(),
+      findByAction: jest.fn(),
+      deleteOlderThan: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuditLogService,
         {
-          provide: getRepositoryToken(AuditLogSchema),
+          provide: AUDIT_LOG_REPOSITORY,
           useValue: mockRepository,
         },
       ],
     }).compile();
 
     service = module.get<AuditLogService>(AuditLogService);
-    repository = module.get(getRepositoryToken(AuditLogSchema));
   });
 
   afterEach(() => {
@@ -73,19 +63,17 @@ describe('AuditLogService', () => {
         userAgent: 'Mozilla/5.0',
       };
 
-      repository.create.mockReturnValue(mockSchema);
-      repository.save.mockResolvedValue(mockSchema);
+      mockRepository.create.mockResolvedValue(mockEntity);
 
       const result = await service.log(entry);
 
-      expect(repository.create).toHaveBeenCalledWith(
+      expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'user_data_exported',
           userId: 'user-001',
           organizationId: 'org-001',
         }),
       );
-      expect(repository.save).toHaveBeenCalled();
       expect(result.id).toBe('log-001');
       expect(result.action).toBe('user_data_exported');
       expect(result.userId).toBe('user-001');
@@ -97,17 +85,19 @@ describe('AuditLogService', () => {
         userId: 'user-001',
       };
 
-      const minimalSchema = {
-        ...mockSchema,
-        organizationId: null,
-        performedBy: null,
-        ipAddress: null,
-        userAgent: null,
+      const minimalEntity = new AuditLogEntity({
+        id: 'log-001',
+        action: 'user_login',
+        userId: 'user-001',
+        organizationId: undefined,
+        performedBy: undefined,
+        ipAddress: undefined,
+        userAgent: undefined,
         metadata: {},
-      };
+        createdAt: new Date('2024-01-15'),
+      });
 
-      repository.create.mockReturnValue(minimalSchema);
-      repository.save.mockResolvedValue(minimalSchema);
+      mockRepository.create.mockResolvedValue(minimalEntity);
 
       const result = await service.log(entry);
 
@@ -129,8 +119,13 @@ describe('AuditLogService', () => {
           organizationId: 'org-001',
         };
 
-        repository.create.mockReturnValue({ ...mockSchema, action });
-        repository.save.mockResolvedValue({ ...mockSchema, action });
+        const lgpdEntity = new AuditLogEntity({
+          ...mockEntity,
+          id: 'log-001',
+          action,
+        });
+
+        mockRepository.create.mockResolvedValue(lgpdEntity);
 
         const result = await service.log(entry);
 
@@ -144,12 +139,11 @@ describe('AuditLogService', () => {
         userId: 'user-001',
       };
 
-      repository.create.mockReturnValue(mockSchema);
-      repository.save.mockResolvedValue(mockSchema);
+      mockRepository.create.mockResolvedValue(mockEntity);
 
       await service.log(entry);
 
-      expect(repository.create).toHaveBeenCalledWith(
+      expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           createdAt: expect.any(Date),
         }),
@@ -159,13 +153,17 @@ describe('AuditLogService', () => {
 
   describe('getAuditTrail', () => {
     it('should return audit trail for a user', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockSchema], 1]);
+      mockRepository.findByUser.mockResolvedValue({
+        data: [mockEntity],
+        total: 1,
+      });
 
       const result = await service.getAuditTrail('user-001');
 
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'audit_logs.user_id = :userId',
-        { userId: 'user-001' },
+      expect(mockRepository.findByUser).toHaveBeenCalledWith(
+        'user-001',
+        undefined,
+        expect.any(Object),
       );
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(1);
@@ -173,18 +171,25 @@ describe('AuditLogService', () => {
     });
 
     it('should filter by organization when provided', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockSchema], 1]);
+      mockRepository.findByUser.mockResolvedValue({
+        data: [mockEntity],
+        total: 1,
+      });
 
       await service.getAuditTrail('user-001', 'org-001');
 
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'audit_logs.organization_id = :organizationId',
-        { organizationId: 'org-001' },
+      expect(mockRepository.findByUser).toHaveBeenCalledWith(
+        'user-001',
+        'org-001',
+        expect.any(Object),
       );
     });
 
     it('should apply date filters when provided', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+      mockRepository.findByUser.mockResolvedValue({
+        data: [],
+        total: 0,
+      });
 
       const startDate = new Date('2024-01-01');
       const endDate = new Date('2024-12-31');
@@ -194,106 +199,143 @@ describe('AuditLogService', () => {
         endDate,
       });
 
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'audit_logs.created_at BETWEEN :startDate AND :endDate',
-        { startDate, endDate },
+      expect(mockRepository.findByUser).toHaveBeenCalledWith(
+        'user-001',
+        undefined,
+        expect.objectContaining({
+          startDate,
+          endDate,
+        }),
       );
     });
 
     it('should apply limit and offset', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+      mockRepository.findByUser.mockResolvedValue({
+        data: [],
+        total: 0,
+      });
 
       await service.getAuditTrail('user-001', undefined, {
         limit: 50,
         offset: 10,
       });
 
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(50);
-      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(10);
-    });
-
-    it('should use default limit when not specified', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
-
-      await service.getAuditTrail('user-001');
-
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(100);
-      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
-    });
-
-    it('should order by created_at DESC', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
-
-      await service.getAuditTrail('user-001');
-
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'audit_logs.created_at',
-        'DESC',
+      expect(mockRepository.findByUser).toHaveBeenCalledWith(
+        'user-001',
+        undefined,
+        expect.objectContaining({
+          limit: 50,
+          offset: 10,
+        }),
       );
+    });
+
+    it('should pass options to repository', async () => {
+      mockRepository.findByUser.mockResolvedValue({
+        data: [],
+        total: 0,
+      });
+
+      await service.getAuditTrail('user-001');
+
+      expect(mockRepository.findByUser).toHaveBeenCalledWith(
+        'user-001',
+        undefined,
+        expect.objectContaining({
+          action: undefined,
+          startDate: undefined,
+          endDate: undefined,
+          limit: undefined,
+          offset: undefined,
+        }),
+      );
+    });
+
+    it('should return result from repository', async () => {
+      mockRepository.findByUser.mockResolvedValue({
+        data: [mockEntity],
+        total: 5,
+      });
+
+      const result = await service.getAuditTrail('user-001');
+
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(5);
     });
   });
 
   describe('getByAction', () => {
     it('should return logs for a specific action', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockSchema], 1]);
+      mockRepository.findByAction.mockResolvedValue({
+        data: [mockEntity],
+        total: 1,
+      });
 
       const result = await service.getByAction('user_data_exported');
 
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'audit_logs.action = :action',
-        { action: 'user_data_exported' },
+      expect(mockRepository.findByAction).toHaveBeenCalledWith(
+        'user_data_exported',
+        undefined,
+        expect.any(Object),
       );
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(1);
     });
 
     it('should filter by organization when provided', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+      mockRepository.findByAction.mockResolvedValue({
+        data: [],
+        total: 0,
+      });
 
       await service.getByAction('user_data_deleted', 'org-001');
 
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'audit_logs.organization_id = :organizationId',
-        { organizationId: 'org-001' },
+      expect(mockRepository.findByAction).toHaveBeenCalledWith(
+        'user_data_deleted',
+        'org-001',
+        expect.any(Object),
       );
     });
 
     it('should apply options filters', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+      mockRepository.findByAction.mockResolvedValue({
+        data: [],
+        total: 0,
+      });
+
+      const startDate = new Date('2024-01-01');
 
       await service.getByAction('user_login', undefined, {
         limit: 25,
-        startDate: new Date('2024-01-01'),
+        startDate,
       });
 
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(25);
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'audit_logs.created_at >= :startDate',
-        expect.any(Object),
+      expect(mockRepository.findByAction).toHaveBeenCalledWith(
+        'user_login',
+        undefined,
+        expect.objectContaining({
+          limit: 25,
+          startDate,
+        }),
       );
     });
   });
 
   describe('cleanupOldLogs', () => {
     it('should delete logs older than 2 years', async () => {
-      mockQueryBuilder.execute.mockResolvedValue({ affected: 150 });
+      mockRepository.deleteOlderThan.mockResolvedValue(150);
 
       const result = await service.cleanupOldLogs();
 
-      expect(mockQueryBuilder.delete).toHaveBeenCalled();
-      expect(mockQueryBuilder.from).toHaveBeenCalledWith(AuditLogSchema);
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'created_at < :retentionDate',
-        expect.objectContaining({
-          retentionDate: expect.any(Date),
-        }),
+      expect(mockRepository.deleteOlderThan).toHaveBeenCalledWith(
+        expect.any(Date),
       );
       expect(result.deletedCount).toBe(150);
       expect(result.retentionDate).toBeInstanceOf(Date);
     });
 
     it('should return 0 when no old logs exist', async () => {
-      mockQueryBuilder.execute.mockResolvedValue({ affected: 0 });
+      mockRepository.deleteOlderThan.mockResolvedValue(0);
 
       const result = await service.cleanupOldLogs();
 
@@ -301,55 +343,63 @@ describe('AuditLogService', () => {
     });
 
     it('should calculate retention date as 2 years ago', async () => {
-      mockQueryBuilder.execute.mockResolvedValue({ affected: 0 });
+      mockRepository.deleteOlderThan.mockResolvedValue(0);
 
-      const beforeCall = new Date();
       const result = await service.cleanupOldLogs();
-      const afterCall = new Date();
 
       const expectedRetentionYear = new Date().getFullYear() - 2;
 
       expect(result.retentionDate.getFullYear()).toBe(expectedRetentionYear);
     });
 
-    it('should handle null affected count', async () => {
-      mockQueryBuilder.execute.mockResolvedValue({ affected: null });
+    it('should pass retention date to repository', async () => {
+      mockRepository.deleteOlderThan.mockResolvedValue(10);
 
-      const result = await service.cleanupOldLogs();
+      await service.cleanupOldLogs();
 
-      expect(result.deletedCount).toBe(0);
+      const calledDate = mockRepository.deleteOlderThan.mock.calls[0][0];
+      const expectedYear = new Date().getFullYear() - 2;
+      expect(calledDate.getFullYear()).toBe(expectedYear);
     });
   });
 
-  describe('domain entity conversion', () => {
-    it('should convert schema to domain entity correctly', async () => {
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockSchema], 1]);
+  describe('domain entity handling', () => {
+    it('should return entities from repository correctly', async () => {
+      mockRepository.findByUser.mockResolvedValue({
+        data: [mockEntity],
+        total: 1,
+      });
 
       const result = await service.getAuditTrail('user-001');
       const entity = result.data[0];
 
-      expect(entity.id).toBe(mockSchema.id);
-      expect(entity.action).toBe(mockSchema.action);
-      expect(entity.userId).toBe(mockSchema.userId);
-      expect(entity.organizationId).toBe(mockSchema.organizationId);
-      expect(entity.metadata).toEqual(mockSchema.metadata);
-      expect(entity.ipAddress).toBe(mockSchema.ipAddress);
-      expect(entity.userAgent).toBe(mockSchema.userAgent);
-      expect(entity.createdAt).toEqual(mockSchema.createdAt);
+      expect(entity.id).toBe(mockEntity.id);
+      expect(entity.action).toBe(mockEntity.action);
+      expect(entity.userId).toBe(mockEntity.userId);
+      expect(entity.organizationId).toBe(mockEntity.organizationId);
+      expect(entity.metadata).toEqual(mockEntity.metadata);
+      expect(entity.ipAddress).toBe(mockEntity.ipAddress);
+      expect(entity.userAgent).toBe(mockEntity.userAgent);
+      expect(entity.createdAt).toEqual(mockEntity.createdAt);
     });
 
-    it('should convert null optional fields to undefined', async () => {
-      const schemaWithNulls = {
-        ...mockSchema,
-        organizationId: null,
-        performedBy: null,
-        ipAddress: null,
-        userAgent: null,
-      };
+    it('should handle entities with undefined optional fields', async () => {
+      const entityWithUndefined = new AuditLogEntity({
+        id: 'log-002',
+        action: 'user_login',
+        userId: 'user-001',
+        organizationId: undefined,
+        performedBy: undefined,
+        ipAddress: undefined,
+        userAgent: undefined,
+        metadata: {},
+        createdAt: new Date('2024-01-15'),
+      });
 
-      mockQueryBuilder.getManyAndCount.mockResolvedValue(
-        [[schemaWithNulls], 1],
-      );
+      mockRepository.findByUser.mockResolvedValue({
+        data: [entityWithUndefined],
+        total: 1,
+      });
 
       const result = await service.getAuditTrail('user-001');
       const entity = result.data[0];
@@ -362,7 +412,7 @@ describe('AuditLogService', () => {
   });
 
   describe('LGPD compliance', () => {
-    it('should correctly identify LGPD actions', async () => {
+    it('should correctly process LGPD actions', async () => {
       const lgpdActions = [
         'user_data_anonymized',
         'user_data_exported',
@@ -372,23 +422,33 @@ describe('AuditLogService', () => {
       const nonLgpdActions = ['user_login', 'data_access', 'security_event'];
 
       for (const action of lgpdActions) {
-        repository.create.mockReturnValue({ ...mockSchema, action });
-        repository.save.mockResolvedValue({ ...mockSchema, action });
+        const lgpdEntity = new AuditLogEntity({
+          ...mockEntity,
+          id: 'log-001',
+          action,
+        });
+
+        mockRepository.create.mockResolvedValue(lgpdEntity);
 
         await service.log({ action, userId: 'user-001' });
 
         // LGPD actions should be logged (we can't directly test the warning log,
         // but we verify the action is processed)
-        expect(repository.save).toHaveBeenCalled();
+        expect(mockRepository.create).toHaveBeenCalled();
       }
 
       for (const action of nonLgpdActions) {
-        repository.create.mockReturnValue({ ...mockSchema, action });
-        repository.save.mockResolvedValue({ ...mockSchema, action });
+        const nonLgpdEntity = new AuditLogEntity({
+          ...mockEntity,
+          id: 'log-001',
+          action,
+        });
+
+        mockRepository.create.mockResolvedValue(nonLgpdEntity);
 
         await service.log({ action, userId: 'user-001' });
 
-        expect(repository.save).toHaveBeenCalled();
+        expect(mockRepository.create).toHaveBeenCalled();
       }
     });
   });
