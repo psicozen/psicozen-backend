@@ -21,7 +21,8 @@
       "Bash(dir:*)",
       "Bash(findstr:*)",
       "Bash(npm run format:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git fetch:*)"
     ]
   }
 }
