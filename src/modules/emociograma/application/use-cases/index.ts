@@ -8,6 +8,9 @@ export * from './get-team-submissions.use-case';
 export * from './get-aggregated-report.use-case';
 export * from './get-analytics.use-case';
 
+// Export Use Cases
+export * from './export-emociograma.use-case';
+
 // Alert Use Cases
 export * from './get-alert-dashboard.use-case';
 export * from './resolve-alert.use-case';
