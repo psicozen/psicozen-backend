@@ -20,7 +20,8 @@
       "Bash(perl:*)",
       "Bash(dir:*)",
       "Bash(findstr:*)",
-      "Bash(npm run format:*)"
+      "Bash(npm run format:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }
