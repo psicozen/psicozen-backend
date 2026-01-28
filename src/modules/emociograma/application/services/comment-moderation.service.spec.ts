@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   CommentModerationService,
   ModerationResult,
+  ModerationReasonType,
 } from './comment-moderation.service';
 
 describe('CommentModerationService', () => {
@@ -346,6 +347,272 @@ describe('CommentModerationService', () => {
         expect(cleanResult.flagReasons).toBeUndefined();
         expect(flaggedResult.flagReasons).toBeDefined();
         expect(Array.isArray(flaggedResult.flagReasons)).toBe(true);
+      });
+
+      it('should include reasonTypes only when flagged', () => {
+        const cleanResult = service.moderateComment('Bom dia');
+        const flaggedResult = service.moderateComment('Esse idiota');
+
+        expect(cleanResult.reasonTypes).toBeUndefined();
+        expect(flaggedResult.reasonTypes).toBeDefined();
+        expect(Array.isArray(flaggedResult.reasonTypes)).toBe(true);
+        expect(flaggedResult.reasonTypes).toContain('inappropriate_language');
+      });
+    });
+
+    describe('excessive caps detection (gritaria)', () => {
+      it('should detect and sanitize 10+ consecutive caps', () => {
+        const result = service.moderateComment('Isso é AAAAAAAAAAAA demais');
+
+        expect(result.isFlagged).toBe(true);
+        expect(result.flagReasons).toContain(
+          'Texto com caps excessivos sanitizado',
+        );
+        expect(result.reasonTypes).toContain('excessive_caps');
+        // Should convert to first letter + lowercase
+        expect(result.sanitizedComment).not.toContain('AAAAAAAAAAAA');
+      });
+
+      it('should sanitize excessive caps preserving first letter', () => {
+        const result = service.moderateComment('HELLOWORLD123');
+
+        expect(result.isFlagged).toBe(true);
+        expect(result.sanitizedComment).toContain('Helloworld');
+      });
+
+      it('should not flag 9 or fewer consecutive caps', () => {
+        const result = service.moderateComment('Isso é AAAAAAAAA ok');
+
+        // 9 caps should not trigger
+        expect(result.reasonTypes?.includes('excessive_caps')).toBeFalsy();
+      });
+
+      it('should handle multiple excessive caps segments', () => {
+        const result = service.moderateComment(
+          'AAAAAAAAAAAAAA e BBBBBBBBBBBBBB',
+        );
+
+        expect(result.isFlagged).toBe(true);
+        expect(result.reasonTypes).toContain('excessive_caps');
+        expect(result.sanitizedComment).not.toContain('AAAAAAAAAAAAAA');
+        expect(result.sanitizedComment).not.toContain('BBBBBBBBBBBBBB');
+      });
+    });
+
+    describe('spam detection (repeated characters)', () => {
+      it('should detect and sanitize 6+ repeated characters', () => {
+        const result = service.moderateComment('Hellooooooo world');
+
+        expect(result.isFlagged).toBe(true);
+        expect(result.flagReasons).toContain(
+          'Spam de caracteres detectado e sanitizado',
+        );
+        expect(result.reasonTypes).toContain('spam');
+        // Should reduce to max 3 repetitions
+        expect(result.sanitizedComment).toContain('ooo');
+        expect(result.sanitizedComment).not.toContain('oooooo');
+      });
+
+      it('should reduce repeated characters to maximum of 3', () => {
+        const result = service.moderateComment('Nãoooooooooo');
+
+        expect(result.isFlagged).toBe(true);
+        expect(result.sanitizedComment).toBe('Nãooo');
+      });
+
+      it('should not flag 5 or fewer repeated characters', () => {
+        const result = service.moderateComment('Nãooooo'); // 5 o's
+
+        // 5 repetitions should not trigger spam
+        expect(result.reasonTypes?.includes('spam')).toBeFalsy();
+      });
+
+      it('should handle multiple spam segments', () => {
+        // Note: Spam pattern is case-sensitive, so "Aaaaaaaaaa" only matches
+        // the 9 lowercase 'a's after the capital 'A', resulting in "Aaaa"
+        // For all-lowercase input, both get reduced to 3
+        const result = service.moderateComment('aaaaaaaaaa e bbbbbbbbbb');
+
+        expect(result.isFlagged).toBe(true);
+        expect(result.reasonTypes).toContain('spam');
+        // Both should be reduced to 3
+        expect(result.sanitizedComment).toBe('aaa e bbb');
+      });
+
+      it('should handle repeated punctuation as spam', () => {
+        const result = service.moderateComment('Olá!!!!!!!!!');
+
+        expect(result.isFlagged).toBe(true);
+        expect(result.reasonTypes).toContain('spam');
+        expect(result.sanitizedComment).toBe('Olá!!!');
+      });
+    });
+
+    describe('personal info detection (LGPD compliance)', () => {
+      describe('email detection', () => {
+        it('should detect and remove email addresses', () => {
+          const result = service.moderateComment(
+            'Meu email é teste@exemplo.com',
+          );
+
+          expect(result.isFlagged).toBe(true);
+          expect(result.flagReasons).toContain(
+            'Informação pessoal removida (proteção LGPD)',
+          );
+          expect(result.reasonTypes).toContain('personal_info');
+          expect(result.sanitizedComment).not.toContain('teste@exemplo.com');
+          expect(result.sanitizedComment).toContain(
+            '[INFORMAÇÃO PESSOAL REMOVIDA]',
+          );
+        });
+
+        it('should detect various email formats', () => {
+          const emails = [
+            'user@domain.com',
+            'user.name@domain.com.br',
+            'user-name@sub.domain.org',
+          ];
+
+          emails.forEach((email) => {
+            const result = service.moderateComment(`Contato: ${email}`);
+            expect(result.reasonTypes).toContain('personal_info');
+            expect(result.sanitizedComment).not.toContain(email);
+          });
+        });
+      });
+
+      describe('phone detection', () => {
+        it('should detect Brazilian phone numbers with DDD', () => {
+          const result = service.moderateComment('Meu telefone é 11 98765-4321');
+
+          expect(result.isFlagged).toBe(true);
+          expect(result.reasonTypes).toContain('personal_info');
+          expect(result.sanitizedComment).toContain(
+            '[INFORMAÇÃO PESSOAL REMOVIDA]',
+          );
+        });
+
+        it('should detect phone with parentheses', () => {
+          const result = service.moderateComment('Liga pra (11) 98765-4321');
+
+          expect(result.isFlagged).toBe(true);
+          expect(result.reasonTypes).toContain('personal_info');
+        });
+
+        it('should detect phone without separators', () => {
+          const result = service.moderateComment('Celular: 11987654321');
+
+          expect(result.isFlagged).toBe(true);
+          expect(result.reasonTypes).toContain('personal_info');
+        });
+      });
+
+      describe('CPF detection', () => {
+        it('should detect CPF in standard format (XXX.XXX.XXX-XX)', () => {
+          const result = service.moderateComment('CPF: 123.456.789-00');
+
+          expect(result.isFlagged).toBe(true);
+          expect(result.reasonTypes).toContain('personal_info');
+          expect(result.sanitizedComment).not.toContain('123.456.789-00');
+          expect(result.sanitizedComment).toContain(
+            '[INFORMAÇÃO PESSOAL REMOVIDA]',
+          );
+        });
+
+        it('should detect CPF without formatting (11 digits)', () => {
+          const result = service.moderateComment('Meu CPF é 12345678900');
+
+          expect(result.isFlagged).toBe(true);
+          expect(result.reasonTypes).toContain('personal_info');
+        });
+      });
+
+      describe('multiple personal info', () => {
+        it('should remove multiple personal info items', () => {
+          const result = service.moderateComment(
+            'Email: teste@test.com, CPF: 123.456.789-00',
+          );
+
+          expect(result.isFlagged).toBe(true);
+          expect(result.reasonTypes).toContain('personal_info');
+          // Should have two replacements
+          const matches = result.sanitizedComment.match(
+            /\[INFORMAÇÃO PESSOAL REMOVIDA\]/g,
+          );
+          expect(matches?.length).toBeGreaterThanOrEqual(2);
+        });
+      });
+    });
+
+    describe('reasonTypes field', () => {
+      it('should include inappropriate_language for blocked words', () => {
+        const result = service.moderateComment('Esse idiota');
+
+        expect(result.reasonTypes).toContain('inappropriate_language');
+      });
+
+      it('should include urgent_content for urgent patterns', () => {
+        const result = service.moderateComment('Quero me machucar');
+
+        expect(result.reasonTypes).toContain('urgent_content');
+      });
+
+      it('should include excessive_caps for caps abuse', () => {
+        const result = service.moderateComment('AAAAAAAAAAAAAAA');
+
+        expect(result.reasonTypes).toContain('excessive_caps');
+      });
+
+      it('should include spam for repeated characters', () => {
+        const result = service.moderateComment('Hellooooooooooo');
+
+        expect(result.reasonTypes).toContain('spam');
+      });
+
+      it('should include personal_info for PII', () => {
+        const result = service.moderateComment('Email: test@test.com');
+
+        expect(result.reasonTypes).toContain('personal_info');
+      });
+
+      it('should include multiple reasonTypes when applicable', () => {
+        // Comment with inappropriate language + personal info
+        const result = service.moderateComment(
+          'Esse idiota, meu email é test@test.com',
+        );
+
+        expect(result.reasonTypes).toContain('inappropriate_language');
+        expect(result.reasonTypes).toContain('personal_info');
+        expect(result.reasonTypes?.length).toBeGreaterThanOrEqual(2);
+      });
+    });
+
+    describe('new combined scenarios', () => {
+      it('should handle spam + personal info together', () => {
+        const result = service.moderateComment(
+          'Oiiiiiiiiii, meu email é test@test.com',
+        );
+
+        expect(result.isFlagged).toBe(true);
+        expect(result.reasonTypes).toContain('spam');
+        expect(result.reasonTypes).toContain('personal_info');
+        expect(result.sanitizedComment).toContain('Oiii');
+        expect(result.sanitizedComment).toContain(
+          '[INFORMAÇÃO PESSOAL REMOVIDA]',
+        );
+      });
+
+      it('should handle all moderation types in one comment', () => {
+        const result = service.moderateComment(
+          'AAAAAAAAAAAA idiota!!!!!!!!!! meu email é test@test.com',
+        );
+
+        expect(result.isFlagged).toBe(true);
+        // Should have: excessive_caps, inappropriate_language, spam, personal_info
+        expect(result.reasonTypes).toContain('excessive_caps');
+        expect(result.reasonTypes).toContain('inappropriate_language');
+        expect(result.reasonTypes).toContain('spam');
+        expect(result.reasonTypes).toContain('personal_info');
       });
     });
   });
