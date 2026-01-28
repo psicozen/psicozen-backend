@@ -59,8 +59,14 @@ describe('EmociogramaController', () => {
         { provide: SubmitEmociogramaUseCase, useValue: { execute: jest.fn() } },
         { provide: GetMySubmissionsUseCase, useValue: { execute: jest.fn() } },
         { provide: GetSubmissionByIdUseCase, useValue: { execute: jest.fn() } },
-        { provide: GetTeamSubmissionsUseCase, useValue: { execute: jest.fn() } },
-        { provide: GetAggregatedReportUseCase, useValue: { execute: jest.fn() } },
+        {
+          provide: GetTeamSubmissionsUseCase,
+          useValue: { execute: jest.fn() },
+        },
+        {
+          provide: GetAggregatedReportUseCase,
+          useValue: { execute: jest.fn() },
+        },
         { provide: GetAnalyticsUseCase, useValue: { execute: jest.fn() } },
         Reflector,
       ],
@@ -92,7 +98,11 @@ describe('EmociogramaController', () => {
 
       const result = await controller.submit(dto, userId, organizationId);
 
-      expect(submitUseCase.execute).toHaveBeenCalledWith(dto, userId, organizationId);
+      expect(submitUseCase.execute).toHaveBeenCalledWith(
+        dto,
+        userId,
+        organizationId,
+      );
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockSubmission);
     });
@@ -117,7 +127,11 @@ describe('EmociogramaController', () => {
       };
       getMySubmissionsUseCase.execute.mockResolvedValue(mockResult);
 
-      const result = await controller.getMySubmissions(userId, organizationId, pagination);
+      const result = await controller.getMySubmissions(
+        userId,
+        organizationId,
+        pagination,
+      );
 
       expect(result.success).toBe(true);
       expect(result.data).toEqual([mockSubmission]);
@@ -157,7 +171,10 @@ describe('EmociogramaController', () => {
 
       const result = await controller.getTeamAggregated(organizationId, query);
 
-      expect(getAggregatedReportUseCase.execute).toHaveBeenCalledWith(query, organizationId);
+      expect(getAggregatedReportUseCase.execute).toHaveBeenCalledWith(
+        query,
+        organizationId,
+      );
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockReport);
     });
@@ -176,7 +193,11 @@ describe('EmociogramaController', () => {
       };
       getTeamSubmissionsUseCase.execute.mockResolvedValue(mockAnonymized);
 
-      const result = await controller.getTeamAnonymized(organizationId, pagination, userId);
+      const result = await controller.getTeamAnonymized(
+        organizationId,
+        pagination,
+        userId,
+      );
 
       expect(getTeamSubmissionsUseCase.execute).toHaveBeenCalledWith(
         organizationId,
@@ -196,14 +217,27 @@ describe('EmociogramaController', () => {
 
     it('deve retornar relatório da organização', async () => {
       const mockReport: AggregatedReportResponse = {
-        summary: { totalSubmissions: 500, averageEmotionLevel: 4.2, motivationScore: 68, anonymityRate: 25 },
+        summary: {
+          totalSubmissions: 500,
+          averageEmotionLevel: 4.2,
+          motivationScore: 68,
+          anonymityRate: 25,
+        },
         trends: { direction: 'improving', dailyAverages: [] },
         distribution: { byLevel: [], byCategory: [] },
-        alerts: { totalAlertsTriggered: 50, criticalCount: 10, highCount: 15, mediumCount: 25 },
+        alerts: {
+          totalAlertsTriggered: 50,
+          criticalCount: 10,
+          highCount: 15,
+          mediumCount: 25,
+        },
       };
       getAggregatedReportUseCase.execute.mockResolvedValue(mockReport);
 
-      const result = await controller.getOrganizationReport(organizationId, query);
+      const result = await controller.getOrganizationReport(
+        organizationId,
+        query,
+      );
 
       expect(result.success).toBe(true);
       expect(result.data?.summary.totalSubmissions).toBe(500);
@@ -233,9 +267,15 @@ describe('EmociogramaController', () => {
       };
       getAnalyticsUseCase.execute.mockResolvedValue(mockAnalytics);
 
-      const result = await controller.getOrganizationAnalytics(organizationId, query);
+      const result = await controller.getOrganizationAnalytics(
+        organizationId,
+        query,
+      );
 
-      expect(getAnalyticsUseCase.execute).toHaveBeenCalledWith(organizationId, query);
+      expect(getAnalyticsUseCase.execute).toHaveBeenCalledWith(
+        organizationId,
+        query,
+      );
       expect(result.success).toBe(true);
       expect(result.data?.motivation.overallScore).toBe(72);
     });

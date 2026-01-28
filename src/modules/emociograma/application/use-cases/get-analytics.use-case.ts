@@ -61,8 +61,14 @@ export class GetAnalyticsUseCase {
 
     // Buscar dados de motivação
     const [mostMotivated, leastMotivated, aggregatedData] = await Promise.all([
-      this.submissionRepository.getMostMotivated(organizationId, query.limit || 10),
-      this.submissionRepository.getLeastMotivated(organizationId, query.limit || 10),
+      this.submissionRepository.getMostMotivated(
+        organizationId,
+        query.limit || 10,
+      ),
+      this.submissionRepository.getLeastMotivated(
+        organizationId,
+        query.limit || 10,
+      ),
       this.submissionRepository.getAggregatedByTimeRange(
         organizationId,
         query.startDate,
@@ -115,7 +121,10 @@ export class GetAnalyticsUseCase {
 
     // Dias de pico (menor emoção = melhor) e baixa (maior emoção = pior)
     const peakDays = sorted.slice(0, 3).map((d) => d.date);
-    const lowDays = sorted.slice(-3).reverse().map((d) => d.date);
+    const lowDays = sorted
+      .slice(-3)
+      .reverse()
+      .map((d) => d.date);
 
     // Calcular média por dia da semana
     const byDayOfWeek: Record<number, { total: number; count: number }> = {};
