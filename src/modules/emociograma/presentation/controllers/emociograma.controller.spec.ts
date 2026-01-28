@@ -5,27 +5,31 @@ import { EmociogramaController } from './emociograma.controller';
 import { SubmitEmociogramaUseCase } from '../../application/use-cases/submit-emociograma.use-case';
 import { GetMySubmissionsUseCase } from '../../application/use-cases/get-my-submissions.use-case';
 import { GetSubmissionByIdUseCase } from '../../application/use-cases/get-submission-by-id.use-case';
+import { ExportEmociogramaUseCase } from '../../application/use-cases/export-emociograma.use-case';
 import { GetTeamSubmissionsUseCase } from '../../application/use-cases/get-team-submissions.use-case';
 import { GetAggregatedReportUseCase } from '../../application/use-cases/get-aggregated-report.use-case';
+import type { AggregatedReportResponse } from '../../application/use-cases/get-aggregated-report.use-case';
 import { GetAnalyticsUseCase } from '../../application/use-cases/get-analytics.use-case';
+import type { AnalyticsResponse } from '../../application/use-cases/get-analytics.use-case';
 import { SupabaseAuthGuard } from '../../../auth/presentation/guards/supabase-auth.guard';
 import { RolesGuard } from '../../../../core/presentation/guards/roles.guard';
 import { SubmitEmociogramaDto } from '../../application/dtos/submit-emociograma.dto';
 import { AggregatedReportDto } from '../../application/dtos/aggregated-report.dto';
 import { AnalyticsQueryDto } from '../../application/dtos/analytics-query.dto';
+import { ExportQueryDto, ExportFormat } from '../../application/dtos/export-query.dto';
 import { PaginationDto } from '../../../../core/application/dtos/pagination.dto';
 import { EmociogramaSubmissionEntity } from '../../domain/entities/submission.entity';
 import { Role } from '../../../roles/domain/enums/role.enum';
 import type { UserPayload } from '../../../../core/presentation/decorators/current-user.decorator';
 import type { PaginatedResult } from '../../../../core/domain/repositories/base.repository.interface';
-import type { AggregatedReportResponse } from '../../application/use-cases/get-aggregated-report.use-case';
-import type { AnalyticsResponse } from '../../application/use-cases/get-analytics.use-case';
+import type { Response } from 'express';
 
 describe('EmociogramaController', () => {
   let controller: EmociogramaController;
   let submitUseCase: jest.Mocked<SubmitEmociogramaUseCase>;
   let getMySubmissionsUseCase: jest.Mocked<GetMySubmissionsUseCase>;
   let getSubmissionByIdUseCase: jest.Mocked<GetSubmissionByIdUseCase>;
+  let exportUseCase: jest.Mocked<ExportEmociogramaUseCase>;
   let getTeamSubmissionsUseCase: jest.Mocked<GetTeamSubmissionsUseCase>;
   let getAggregatedReportUseCase: jest.Mocked<GetAggregatedReportUseCase>;
   let getAnalyticsUseCase: jest.Mocked<GetAnalyticsUseCase>;
@@ -53,15 +57,62 @@ describe('EmociogramaController', () => {
   };
 
   beforeEach(async () => {
+    const mockSubmitUseCase = {
+      execute: jest.fn(),
+    };
+
+    const mockGetMySubmissionsUseCase = {
+      execute: jest.fn(),
+    };
+
+    const mockGetSubmissionByIdUseCase = {
+      execute: jest.fn(),
+    };
+
+    const mockExportUseCase = {
+      execute: jest.fn(),
+    };
+
+    const mockGetTeamSubmissionsUseCase = {
+      execute: jest.fn(),
+    };
+
+    const mockGetAggregatedReportUseCase = {
+      execute: jest.fn(),
+    };
+
+    const mockGetAnalyticsUseCase = {
+      execute: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [EmociogramaController],
       providers: [
-        { provide: SubmitEmociogramaUseCase, useValue: { execute: jest.fn() } },
-        { provide: GetMySubmissionsUseCase, useValue: { execute: jest.fn() } },
-        { provide: GetSubmissionByIdUseCase, useValue: { execute: jest.fn() } },
-        { provide: GetTeamSubmissionsUseCase, useValue: { execute: jest.fn() } },
-        { provide: GetAggregatedReportUseCase, useValue: { execute: jest.fn() } },
-        { provide: GetAnalyticsUseCase, useValue: { execute: jest.fn() } },
+        { provide: SubmitEmociogramaUseCase, useValue: mockSubmitUseCase },
+        {
+          provide: GetMySubmissionsUseCase,
+          useValue: mockGetMySubmissionsUseCase,
+        },
+        {
+          provide: GetSubmissionByIdUseCase,
+          useValue: mockGetSubmissionByIdUseCase,
+        },
+        {
+          provide: ExportEmociogramaUseCase,
+          useValue: mockExportUseCase,
+        },
+        {
+          provide: GetTeamSubmissionsUseCase,
+          useValue: mockGetTeamSubmissionsUseCase,
+        },
+        {
+          provide: GetAggregatedReportUseCase,
+          useValue: mockGetAggregatedReportUseCase,
+        },
+        {
+          provide: GetAnalyticsUseCase,
+          useValue: mockGetAnalyticsUseCase,
+        },
         Reflector,
       ],
     })
@@ -75,6 +126,7 @@ describe('EmociogramaController', () => {
     submitUseCase = module.get(SubmitEmociogramaUseCase);
     getMySubmissionsUseCase = module.get(GetMySubmissionsUseCase);
     getSubmissionByIdUseCase = module.get(GetSubmissionByIdUseCase);
+    exportUseCase = module.get(ExportEmociogramaUseCase);
     getTeamSubmissionsUseCase = module.get(GetTeamSubmissionsUseCase);
     getAggregatedReportUseCase = module.get(GetAggregatedReportUseCase);
     getAnalyticsUseCase = module.get(GetAnalyticsUseCase);
@@ -238,6 +290,136 @@ describe('EmociogramaController', () => {
       expect(getAnalyticsUseCase.execute).toHaveBeenCalledWith(organizationId, query);
       expect(result.success).toBe(true);
       expect(result.data?.motivation.overallScore).toBe(72);
+    });
+  });
+
+  describe('exportData', () => {
+    const mockResponse = {
+      setHeader: jest.fn(),
+      send: jest.fn(),
+    } as unknown as Response;
+
+    const exportQuery: ExportQueryDto = {
+      startDate: new Date('2024-01-01'),
+      endDate: new Date('2024-01-31'),
+      format: ExportFormat.CSV,
+    };
+
+    const mockExportResult = {
+      data: 'Data,Nível Emocional\n2024-01-15,3',
+      mimeType: 'text/csv; charset=utf-8',
+      filename: 'emociograma_20240115.csv',
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('deve exportar dados com sucesso', async () => {
+      // Arrange
+      exportUseCase.execute.mockResolvedValue(mockExportResult);
+
+      // Act
+      await controller.exportData(
+        organizationId,
+        exportQuery,
+        userId,
+        Role.ADMIN,
+        mockResponse,
+      );
+
+      // Assert
+      expect(exportUseCase.execute).toHaveBeenCalledWith(
+        organizationId,
+        exportQuery,
+        userId,
+        Role.ADMIN,
+      );
+      expect(mockResponse.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        mockExportResult.mimeType,
+      );
+      expect(mockResponse.setHeader).toHaveBeenCalledWith(
+        'Content-Disposition',
+        `attachment; filename="${mockExportResult.filename}"`,
+      );
+      expect(mockResponse.send).toHaveBeenCalledWith(mockExportResult.data);
+    });
+
+    it('deve lançar BadRequestException quando organizationId não é fornecido', async () => {
+      // Act & Assert
+      await expect(
+        controller.exportData('', exportQuery, userId, Role.ADMIN, mockResponse),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('deve exportar dados no formato Excel', async () => {
+      // Arrange
+      const excelQuery: ExportQueryDto = {
+        ...exportQuery,
+        format: ExportFormat.EXCEL,
+      };
+      const excelResult = {
+        data: Buffer.from('excel-data'),
+        mimeType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        filename: 'emociograma_20240115.xlsx',
+      };
+      exportUseCase.execute.mockResolvedValue(excelResult);
+
+      // Act
+      await controller.exportData(
+        organizationId,
+        excelQuery,
+        userId,
+        Role.ADMIN,
+        mockResponse,
+      );
+
+      // Assert
+      expect(mockResponse.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        excelResult.mimeType,
+      );
+      expect(mockResponse.send).toHaveBeenCalledWith(excelResult.data);
+    });
+
+    it('deve usar role GESTOR para exportação', async () => {
+      // Arrange
+      exportUseCase.execute.mockResolvedValue(mockExportResult);
+
+      // Act
+      await controller.exportData(
+        organizationId,
+        exportQuery,
+        userId,
+        Role.GESTOR,
+        mockResponse,
+      );
+
+      // Assert
+      expect(exportUseCase.execute).toHaveBeenCalledWith(
+        organizationId,
+        exportQuery,
+        userId,
+        Role.GESTOR,
+      );
+    });
+
+    it('deve propagar erros do use case', async () => {
+      // Arrange
+      exportUseCase.execute.mockRejectedValue(new Error('Export failed'));
+
+      // Act & Assert
+      await expect(
+        controller.exportData(
+          organizationId,
+          exportQuery,
+          userId,
+          Role.ADMIN,
+          mockResponse,
+        ),
+      ).rejects.toThrow('Export failed');
     });
   });
 });

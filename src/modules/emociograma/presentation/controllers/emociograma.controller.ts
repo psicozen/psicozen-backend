@@ -10,7 +10,9 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -19,6 +21,7 @@ import {
   ApiParam,
   ApiHeader,
   ApiQuery,
+  ApiProduces,
 } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../../../auth/presentation/guards/supabase-auth.guard';
 import { RolesGuard } from '../../../../core/presentation/guards/roles.guard';
@@ -34,6 +37,7 @@ import {
   SubmitEmociogramaUseCase,
   GetMySubmissionsUseCase,
   GetSubmissionByIdUseCase,
+  ExportEmociogramaUseCase,
   GetTeamSubmissionsUseCase,
   GetAggregatedReportUseCase,
   GetAnalyticsUseCase,
@@ -46,6 +50,7 @@ import {
   AggregatedReportDto,
   AnalyticsQueryDto,
   SubmissionResponseDto,
+  ExportQueryDto,
 } from '../../application/dtos';
 import type { EmociogramaSubmissionEntity } from '../../domain/entities/submission.entity';
 import type { MaskedSubmissionData } from '../../domain/entities/submission.entity';
@@ -53,11 +58,18 @@ import type { MaskedSubmissionData } from '../../domain/entities/submission.enti
 /**
  * Controller do Emociograma
  *
- * Gerencia todas as operações relacionadas ao emociograma:
- * - Submissão de estado emocional
- * - Consulta de histórico pessoal
- * - Relatórios agregados para gestores
- * - Analytics avançados para admins
+ * Gerencia as operações de submissão e exportação de estado emocional dos colaboradores.
+ * Todos os endpoints requerem autenticação e contexto de organização.
+ *
+ * Endpoints:
+ * - POST /emociograma - Enviar estado emocional
+ * - GET /emociograma/my-submissions - Obter histórico próprio
+ * - GET /emociograma/submission/:id - Obter submissão específica
+ * - GET /emociograma/team/aggregated - Relatório agregado da equipe (GESTOR, ADMIN)
+ * - GET /emociograma/team/anonymized - Submissões anonimizadas (GESTOR, ADMIN)
+ * - GET /emociograma/organization/report - Relatório da organização (ADMIN)
+ * - GET /emociograma/organization/analytics - Analytics avançado (ADMIN)
+ * - GET /emociograma/export - Exportar dados (GESTOR, ADMIN)
  */
 @ApiTags('Emociograma')
 @Controller('emociograma')
@@ -73,10 +85,20 @@ export class EmociogramaController {
     private readonly submitUseCase: SubmitEmociogramaUseCase,
     private readonly getMySubmissionsUseCase: GetMySubmissionsUseCase,
     private readonly getSubmissionByIdUseCase: GetSubmissionByIdUseCase,
+    private readonly exportUseCase: ExportEmociogramaUseCase,
     private readonly getTeamSubmissionsUseCase: GetTeamSubmissionsUseCase,
     private readonly getAggregatedReportUseCase: GetAggregatedReportUseCase,
     private readonly getAnalyticsUseCase: GetAnalyticsUseCase,
   ) {}
+
+  /**
+   * Valida se o organizationId foi fornecido
+   */
+  private validateOrganizationId(organizationId: string): void {
+    if (!organizationId) {
+      throw new BadRequestException('Header x-organization-id é obrigatório');
+    }
+  }
 
   // ===========================
   // SUBMISSION ENDPOINTS
@@ -188,25 +210,38 @@ export class EmociogramaController {
   }
 
   // ===========================
-  // TEAM REPORT ENDPOINTS
+  // REPORT ENDPOINTS
   // ===========================
 
   /**
    * Obter relatório agregado da equipe
+   *
+   * Gera estatísticas agregadas incluindo totais, médias, tendências e distribuições.
    */
   @Get('team/aggregated')
   @Roles(Role.GESTOR, Role.ADMIN)
   @ApiOperation({
     summary: 'Obter relatório agregado da equipe',
     description:
-      'Gestores podem visualizar dados emocionais agregados de sua equipe (sem identidades individuais).',
+      'Gera estatísticas agregadas das submissões da equipe incluindo ' +
+      'totais, médias, tendências e distribuição por categoria.',
   })
-  @ApiQuery({ name: 'startDate', required: true, type: String })
-  @ApiQuery({ name: 'endDate', required: true, type: String })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    type: String,
+    description: 'Data de início do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    type: String,
+    description: 'Data de fim do período (ISO 8601)',
+  })
   @ApiQuery({ name: 'department', required: false, type: String })
   @ApiQuery({ name: 'team', required: false, type: String })
   @ApiQuery({ name: 'categoryId', required: false, type: String })
-  @ApiResponse({ status: 200, description: 'Relatório recuperado com sucesso' })
+  @ApiResponse({ status: 200, description: 'Relatório agregado retornado' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 403, description: 'Sem permissão - requer GESTOR ou ADMIN' })
   async getTeamAggregated(
@@ -225,61 +260,68 @@ export class EmociogramaController {
 
   /**
    * Obter submissões anonimizadas da equipe
+   *
+   * Retorna lista paginada de submissões com dados pessoais mascarados.
    */
   @Get('team/anonymized')
   @Roles(Role.GESTOR, Role.ADMIN)
   @ApiOperation({
     summary: 'Obter submissões anonimizadas da equipe',
     description:
-      'Visualizar lista de submissões com IDs de usuário mascarados. Preserva departamento/equipe para contexto.',
+      'Retorna lista paginada de submissões da equipe com dados ' +
+      'pessoais mascarados para preservar privacidade.',
   })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Submissões recuperadas' })
+  @ApiResponse({ status: 200, description: 'Submissões anonimizadas retornadas' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 403, description: 'Sem permissão - requer GESTOR ou ADMIN' })
   async getTeamAnonymized(
     @Headers('x-organization-id') organizationId: string,
     @Query() pagination: PaginationDto,
     @CurrentUser('id') userId: string,
-  ): Promise<ApiResponseDto<MaskedSubmissionData[]>> {
+  ): Promise<ApiResponseDto<AnonymizedPaginatedResult>> {
     this.validateOrganizationId(organizationId);
 
-    const result = (await this.getTeamSubmissionsUseCase.execute(
+    const result = await this.getTeamSubmissionsUseCase.execute(
       organizationId,
       userId,
       pagination,
-      true, // anonymize = true
-    )) as AnonymizedPaginatedResult;
-
-    return ApiResponseDto.paginated(
-      result.data,
-      result.total,
-      result.page,
-      result.limit,
+      true, // anonymize
     );
-  }
 
-  // ===========================
-  // ORGANIZATION REPORT ENDPOINTS
-  // ===========================
+    return ApiResponseDto.ok(result as AnonymizedPaginatedResult);
+  }
 
   /**
    * Obter relatório completo da organização
+   *
+   * Disponível apenas para ADMIN. Retorna estatísticas de toda a organização.
    */
   @Get('organization/report')
   @Roles(Role.ADMIN)
   @ApiOperation({
     summary: 'Obter relatório da organização',
     description:
-      'Admins podem visualizar dados emocionais completos da organização com estatísticas detalhadas.',
+      'Gera relatório completo com estatísticas de toda a organização. ' +
+      'Disponível apenas para administradores.',
   })
-  @ApiQuery({ name: 'startDate', required: true, type: String })
-  @ApiQuery({ name: 'endDate', required: true, type: String })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    type: String,
+    description: 'Data de início do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    type: String,
+    description: 'Data de fim do período (ISO 8601)',
+  })
   @ApiQuery({ name: 'department', required: false, type: String })
   @ApiQuery({ name: 'team', required: false, type: String })
   @ApiQuery({ name: 'categoryId', required: false, type: String })
-  @ApiResponse({ status: 200, description: 'Relatório recuperado' })
+  @ApiResponse({ status: 200, description: 'Relatório da organização retornado' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 403, description: 'Sem permissão - requer ADMIN' })
   async getOrganizationReport(
@@ -297,19 +339,37 @@ export class EmociogramaController {
   }
 
   /**
-   * Obter analytics avançados da organização
+   * Obter analytics avançado da organização
+   *
+   * Disponível apenas para ADMIN. Retorna analytics com padrões e insights.
    */
   @Get('organization/analytics')
   @Roles(Role.ADMIN)
   @ApiOperation({
     summary: 'Obter analytics da organização',
     description:
-      'Analytics avançados: colaboradores mais/menos motivados, tendências, padrões temporais.',
+      'Gera analytics avançado incluindo colaboradores mais/menos motivados, ' +
+      'padrões temporais e análises por período. Disponível apenas para administradores.',
   })
-  @ApiQuery({ name: 'startDate', required: true, type: String })
-  @ApiQuery({ name: 'endDate', required: true, type: String })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Analytics recuperados' })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    type: String,
+    description: 'Data de início do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    type: String,
+    description: 'Data de fim do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Limite de resultados para listas (padrão: 10)',
+  })
+  @ApiResponse({ status: 200, description: 'Analytics retornado' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 403, description: 'Sem permissão - requer ADMIN' })
   async getOrganizationAnalytics(
@@ -327,15 +387,102 @@ export class EmociogramaController {
   }
 
   // ===========================
-  // HELPER METHODS
+  // EXPORT ENDPOINT
   // ===========================
 
   /**
-   * Valida que o organizationId foi fornecido
+   * Exportar dados do emociograma
+   *
+   * Permite exportar submissões de emociograma em diferentes formatos.
+   * - GESTOR: Exporta dados da equipe (anonimizados)
+   * - ADMIN: Exporta todos os dados da organização
+   *
+   * Formatos suportados: CSV, Excel, JSON
    */
-  private validateOrganizationId(organizationId: string): void {
+  @Get('export')
+  @Roles(Role.GESTOR, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Exportar dados do emociograma',
+    description:
+      'Exportar submissões para formato CSV, Excel ou JSON. ' +
+      'Gestores exportam dados da equipe (anonimizados), Admins exportam todos os dados.',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    type: String,
+    description: 'Data de início do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    type: String,
+    description: 'Data de fim do período (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'format',
+    required: false,
+    enum: ['csv', 'excel', 'json'],
+    description: 'Formato de exportação (padrão: csv)',
+  })
+  @ApiQuery({
+    name: 'department',
+    required: false,
+    type: String,
+    description: 'Filtrar por departamento',
+  })
+  @ApiQuery({
+    name: 'team',
+    required: false,
+    type: String,
+    description: 'Filtrar por equipe',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    type: String,
+    description: 'Filtrar por categoria de emoção',
+  })
+  @ApiProduces('text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/json')
+  @ApiResponse({
+    status: 200,
+    description: 'Arquivo exportado com sucesso',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Parâmetros inválidos ou organização não especificada',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autorizado',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Sem permissão - requer GESTOR ou ADMIN',
+  })
+  async exportData(
+    @Headers('x-organization-id') organizationId: string,
+    @Query() query: ExportQueryDto,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: Role,
+    @Res() response: Response,
+  ): Promise<void> {
     if (!organizationId) {
       throw new BadRequestException('Header x-organization-id é obrigatório');
     }
+
+    const result = await this.exportUseCase.execute(
+      organizationId,
+      query,
+      userId,
+      userRole,
+    );
+
+    response.setHeader('Content-Type', result.mimeType);
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.filename}"`,
+    );
+    response.send(result.data);
   }
 }
