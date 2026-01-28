@@ -32,8 +32,9 @@ describe('AuditLogService', () => {
 
       expect(result.id).toBeDefined();
       expect(result.id.length).toBeGreaterThan(0);
-      expect(result.timestamp).toBeInstanceOf(Date);
-      expect(result.success).toBe(true);
+      expect(result.createdAt).toBeInstanceOf(Date);
+      expect(result.action).toBe('user_data_anonymized');
+      expect(result.userId).toBe('user-001');
     });
 
     it('should generate unique IDs for each log entry', async () => {
@@ -65,7 +66,8 @@ describe('AuditLogService', () => {
 
         const result = await service.log(entry);
 
-        expect(result.success).toBe(true);
+        expect(result.id).toBeDefined();
+        expect(result.isLgpdAction()).toBe(true);
       }
     });
 
@@ -85,21 +87,23 @@ describe('AuditLogService', () => {
 
       const result = await service.log(entry);
 
-      expect(result.success).toBe(true);
       expect(result.id).toBeDefined();
+      expect(result.performedBy).toBe('admin-001');
+      expect(result.ipAddress).toBe('192.168.1.1');
+      expect(result.userAgent).toBe('Mozilla/5.0');
     });
 
     it('should handle entries with minimal fields', async () => {
       const entry: AuditLogEntry = {
         action: 'user_login',
         userId: 'user-001',
-        organizationId: 'org-001',
       };
 
       const result = await service.log(entry);
 
-      expect(result.success).toBe(true);
       expect(result.id).toBeDefined();
+      expect(result.action).toBe('user_login');
+      expect(result.userId).toBe('user-001');
     });
 
     it('should handle custom action types', async () => {
@@ -111,10 +115,11 @@ describe('AuditLogService', () => {
 
       const result = await service.log(entry);
 
-      expect(result.success).toBe(true);
+      expect(result.id).toBeDefined();
+      expect(result.action).toBe('custom_action_type');
     });
 
-    it('should set timestamp close to current time', async () => {
+    it('should set createdAt close to current time', async () => {
       const beforeLog = new Date();
 
       const entry: AuditLogEntry = {
@@ -127,10 +132,10 @@ describe('AuditLogService', () => {
 
       const afterLog = new Date();
 
-      expect(result.timestamp.getTime()).toBeGreaterThanOrEqual(
+      expect(result.createdAt.getTime()).toBeGreaterThanOrEqual(
         beforeLog.getTime(),
       );
-      expect(result.timestamp.getTime()).toBeLessThanOrEqual(
+      expect(result.createdAt.getTime()).toBeLessThanOrEqual(
         afterLog.getTime(),
       );
     });
@@ -157,7 +162,87 @@ describe('AuditLogService', () => {
 
       const result = await service.log(entry);
 
-      expect(result.success).toBe(true);
+      expect(result.id).toBeDefined();
+      expect(result.metadata).toEqual(entry.metadata);
+    });
+  });
+
+  describe('getAuditTrail', () => {
+    it('should return empty result when no logs exist', async () => {
+      const result = await service.getAuditTrail('user-001');
+
+      expect(result.data).toHaveLength(0);
+      expect(result.total).toBe(0);
+    });
+
+    it('should return logs for a specific user', async () => {
+      await service.log({
+        action: 'user_login',
+        userId: 'user-001',
+        organizationId: 'org-001',
+      });
+      await service.log({
+        action: 'user_login',
+        userId: 'user-002',
+        organizationId: 'org-001',
+      });
+
+      const result = await service.getAuditTrail('user-001');
+
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(result.data[0].userId).toBe('user-001');
+    });
+
+    it('should filter by organization when provided', async () => {
+      await service.log({
+        action: 'user_login',
+        userId: 'user-001',
+        organizationId: 'org-001',
+      });
+      await service.log({
+        action: 'user_login',
+        userId: 'user-001',
+        organizationId: 'org-002',
+      });
+
+      const result = await service.getAuditTrail('user-001', 'org-001');
+
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].organizationId).toBe('org-001');
+    });
+  });
+
+  describe('getByAction', () => {
+    it('should return logs for a specific action', async () => {
+      await service.log({
+        action: 'user_login',
+        userId: 'user-001',
+        organizationId: 'org-001',
+      });
+      await service.log({
+        action: 'user_logout',
+        userId: 'user-001',
+        organizationId: 'org-001',
+      });
+
+      const result = await service.getByAction('user_login');
+
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(result.data[0].action).toBe('user_login');
+    });
+  });
+
+  describe('cleanupOldLogs', () => {
+    it('should return cleanup result', async () => {
+      const result = await service.cleanupOldLogs();
+
+      expect(result.deletedCount).toBe(0);
+      expect(result.retentionDate).toBeInstanceOf(Date);
+      expect(result.retentionDate.getFullYear()).toBe(
+        new Date().getFullYear() - 2,
+      );
     });
   });
 });

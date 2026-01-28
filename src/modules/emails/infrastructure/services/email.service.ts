@@ -74,4 +74,67 @@ export class EmailService {
       text: `Welcome ${name}! Thank you for joining PsicoZen.`,
     });
   }
+
+  /**
+   * Enviar email de confirmação para exclusão de dados (LGPD Art. 18, VI)
+   *
+   * @param email - Email do usuário
+   * @param userId - ID do usuário
+   * @param organizationId - ID da organização
+   */
+  async sendDataDeletionConfirmation(
+    email: string,
+    userId: string,
+    organizationId: string,
+  ): Promise<void> {
+    const frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
+
+    // Token de confirmação (expira em 24h)
+    const confirmationToken = Buffer.from(
+      JSON.stringify({
+        userId,
+        organizationId,
+        action: 'data_deletion',
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      }),
+    ).toString('base64url');
+
+    const confirmationLink = `${frontendUrl}/lgpd/confirm-deletion?token=${confirmationToken}`;
+
+    await this.send({
+      to: email,
+      subject: 'Confirmação de Exclusão de Dados - PsicoZen',
+      html: `
+        <h1>Solicitação de Exclusão de Dados</h1>
+        <p>Recebemos sua solicitação para excluir permanentemente seus dados pessoais.</p>
+        <p><strong>ATENÇÃO:</strong> Esta ação é <strong>irreversível</strong>. Todos os seus dados serão permanentemente excluídos.</p>
+        <p>Se você realmente deseja excluir seus dados, clique no link abaixo:</p>
+        <p><a href="${confirmationLink}" style="background-color: #dc3545; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Confirmar Exclusão</a></p>
+        <p>Este link expira em 24 horas.</p>
+        <p>Se você não solicitou esta exclusão, ignore este email.</p>
+        <hr>
+        <p><small>Esta solicitação foi feita em conformidade com a Lei Geral de Proteção de Dados (LGPD) - Artigo 18, VI.</small></p>
+      `,
+      text: `
+        Solicitação de Exclusão de Dados
+
+        Recebemos sua solicitação para excluir permanentemente seus dados pessoais.
+
+        ATENÇÃO: Esta ação é IRREVERSÍVEL. Todos os seus dados serão permanentemente excluídos.
+
+        Para confirmar a exclusão, acesse: ${confirmationLink}
+
+        Este link expira em 24 horas.
+
+        Se você não solicitou esta exclusão, ignore este email.
+
+        LGPD - Artigo 18, VI
+      `,
+    });
+
+    this.logger.log(`Data deletion confirmation email sent to: ${email}`);
+  }
 }

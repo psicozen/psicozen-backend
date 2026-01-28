@@ -1,3 +1,5 @@
+import type { AuditLogEntity } from '../../domain/entities/audit-log.entity';
+
 /**
  * Tipos de ações de auditoria
  */
@@ -5,96 +7,140 @@ export type AuditAction =
   | 'user_data_anonymized'
   | 'user_data_exported'
   | 'user_data_deleted'
+  | 'data_deletion_requested'
   | 'user_login'
   | 'user_logout'
+  | 'user_created'
+  | 'user_updated'
+  | 'user_deactivated'
   | 'data_access'
   | 'data_modification'
   | 'permission_change'
-  | 'security_event';
+  | 'role_assigned'
+  | 'role_removed'
+  | 'security_event'
+  | 'api_access';
 
 /**
- * Entrada de log de auditoria
+ * Entrada de log de auditoria para registro
  */
 export interface AuditLogEntry {
   /** Ação realizada */
   action: AuditAction | string;
-  /** ID do usuário que realizou ou foi alvo da ação */
+
+  /** ID do usuário alvo ou que realizou a ação */
   userId: string;
-  /** ID da organização */
-  organizationId: string;
-  /** Metadados adicionais */
-  metadata?: Record<string, unknown>;
+
+  /** ID da organização relacionada */
+  organizationId?: string;
+
   /** ID do usuário que executou a ação (se diferente do userId) */
   performedBy?: string;
+
+  /** Metadados adicionais */
+  metadata?: Record<string, unknown>;
+
   /** Endereço IP da requisição */
   ipAddress?: string;
+
   /** User Agent da requisição */
   userAgent?: string;
 }
 
 /**
- * Resultado de uma operação de auditoria
+ * Opções para consulta de trilha de auditoria
  */
-export interface AuditLogResult {
-  /** ID único do log */
-  id: string;
-  /** Timestamp da criação */
-  timestamp: Date;
-  /** Indica se foi registrado com sucesso */
-  success: boolean;
+export interface AuditTrailOptions {
+  /** Filtrar por ação específica */
+  action?: AuditAction | string;
+
+  /** Data inicial do período */
+  startDate?: Date;
+
+  /** Data final do período */
+  endDate?: Date;
+
+  /** Número máximo de registros */
+  limit?: number;
+
+  /** Offset para paginação */
+  offset?: number;
+}
+
+/**
+ * Resultado da consulta de trilha de auditoria
+ */
+export interface AuditTrailResult {
+  /** Registros de auditoria */
+  data: AuditLogEntity[];
+
+  /** Total de registros */
+  total: number;
+}
+
+/**
+ * Resultado de operação de limpeza
+ */
+export interface CleanupResult {
+  /** Número de registros removidos */
+  deletedCount: number;
+
+  /** Data limite usada para limpeza */
+  retentionDate: Date;
 }
 
 /**
  * Interface do Serviço de Log de Auditoria
  *
- * Define o contrato para registro de eventos de auditoria.
+ * Define o contrato para registro e consulta de eventos de auditoria.
  * Essencial para conformidade LGPD e rastreabilidade de operações
  * sensíveis relacionadas a dados pessoais.
  */
 export interface IAuditLogService {
   /**
-   * Registrar um evento de auditoria
+   * Registrar uma ação na trilha de auditoria
    *
-   * @param entry - Dados do evento a ser registrado
-   * @returns Resultado da operação de log
+   * @param entry - Dados da entrada de auditoria
+   * @returns Entidade de auditoria criada
    */
-  log(entry: AuditLogEntry): Promise<AuditLogResult>;
+  log(entry: AuditLogEntry): Promise<AuditLogEntity>;
 
   /**
-   * Consultar logs de auditoria por usuário
+   * Obter trilha de auditoria para um usuário
    *
    * @param userId - ID do usuário
-   * @param organizationId - ID da organização
-   * @param options - Opções de consulta (data inicial, final, limite)
-   * @returns Lista de entradas de auditoria
+   * @param organizationId - ID da organização (opcional)
+   * @param options - Opções de filtro e paginação
+   * @returns Resultado com registros e total
    */
-  findByUser?(
+  getAuditTrail(
     userId: string,
-    organizationId: string,
-    options?: {
-      startDate?: Date;
-      endDate?: Date;
-      limit?: number;
-    },
-  ): Promise<AuditLogEntry[]>;
+    organizationId?: string,
+    options?: AuditTrailOptions,
+  ): Promise<AuditTrailResult>;
 
   /**
-   * Consultar logs de auditoria por ação
+   * Obter trilha de auditoria por ação
    *
    * @param action - Tipo de ação
-   * @param organizationId - ID da organização
-   * @param options - Opções de consulta
-   * @returns Lista de entradas de auditoria
+   * @param organizationId - ID da organização (opcional)
+   * @param options - Opções de filtro e paginação
+   * @returns Resultado com registros e total
    */
-  findByAction?(
+  getByAction(
     action: AuditAction | string,
-    organizationId: string,
-    options?: {
-      startDate?: Date;
-      endDate?: Date;
-      limit?: number;
-    },
-  ): Promise<AuditLogEntry[]>;
+    organizationId?: string,
+    options?: AuditTrailOptions,
+  ): Promise<AuditTrailResult>;
+
+  /**
+   * Limpar logs antigos (política de retenção de 2 anos)
+   *
+   * Deve ser executado via cron job para manter conformidade LGPD.
+   *
+   * @returns Resultado da limpeza
+   */
+  cleanupOldLogs(): Promise<CleanupResult>;
 }
 
 /**

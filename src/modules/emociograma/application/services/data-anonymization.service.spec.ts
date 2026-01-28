@@ -7,8 +7,21 @@ import { USER_REPOSITORY } from '../../../users/domain/repositories/user.reposit
 import type { IUserRepository } from '../../../users/domain/repositories/user.repository.interface';
 import { AUDIT_LOG_SERVICE } from '../../../../core/application/services/audit-log.service.interface';
 import type { IAuditLogService } from '../../../../core/application/services/audit-log.service.interface';
+import { AuditLogEntity } from '../../../../core/domain/entities/audit-log.entity';
 import { UserEntity } from '../../../users/domain/entities/user.entity';
 import { EmociogramaSubmissionEntity } from '../../domain/entities/submission.entity';
+
+/** Helper para criar entidade de audit log mock */
+const createMockAuditLogEntity = (action: string): AuditLogEntity => {
+  return new AuditLogEntity({
+    id: 'log-001',
+    action,
+    userId: 'user-001',
+    organizationId: 'org-001',
+    metadata: {},
+    createdAt: new Date(),
+  });
+};
 
 describe('DataAnonymizationService', () => {
   let service: DataAnonymizationService;
@@ -118,11 +131,9 @@ describe('DataAnonymizationService', () => {
     it('should anonymize user data successfully', async () => {
       userRepository.findById.mockResolvedValue(mockUser);
       submissionRepository.anonymizeByUser.mockResolvedValue(undefined);
-      auditLogService.log.mockResolvedValue({
-        id: 'log-001',
-        timestamp: new Date(),
-        success: true,
-      });
+      auditLogService.log.mockResolvedValue(
+        createMockAuditLogEntity('user_data_anonymized'),
+      );
 
       const result = await service.anonymizeUserData('user-001', 'org-001');
 
@@ -164,11 +175,9 @@ describe('DataAnonymizationService', () => {
     it('should log audit entry with LGPD compliance metadata', async () => {
       userRepository.findById.mockResolvedValue(mockUser);
       submissionRepository.anonymizeByUser.mockResolvedValue(undefined);
-      auditLogService.log.mockResolvedValue({
-        id: 'log-001',
-        timestamp: new Date(),
-        success: true,
-      });
+      auditLogService.log.mockResolvedValue(
+        createMockAuditLogEntity('user_data_anonymized'),
+      );
 
       await service.anonymizeUserData('user-001', 'org-001');
 
@@ -188,11 +197,9 @@ describe('DataAnonymizationService', () => {
         limit: 10000,
         totalPages: 1,
       });
-      auditLogService.log.mockResolvedValue({
-        id: 'log-001',
-        timestamp: new Date(),
-        success: true,
-      });
+      auditLogService.log.mockResolvedValue(
+        createMockAuditLogEntity('user_data_anonymized'),
+      );
 
       const result = await service.exportUserData('user-001', 'org-001');
 
@@ -252,11 +259,9 @@ describe('DataAnonymizationService', () => {
         limit: 10000,
         totalPages: 0,
       });
-      auditLogService.log.mockResolvedValue({
-        id: 'log-001',
-        timestamp: new Date(),
-        success: true,
-      });
+      auditLogService.log.mockResolvedValue(
+        createMockAuditLogEntity('user_data_anonymized'),
+      );
 
       const result = await service.exportUserData('user-001', 'org-001');
 
@@ -273,11 +278,9 @@ describe('DataAnonymizationService', () => {
         limit: 10000,
         totalPages: 1,
       });
-      auditLogService.log.mockResolvedValue({
-        id: 'log-001',
-        timestamp: new Date(),
-        success: true,
-      });
+      auditLogService.log.mockResolvedValue(
+        createMockAuditLogEntity('user_data_anonymized'),
+      );
 
       await service.exportUserData('user-001', 'org-001');
 
@@ -292,11 +295,9 @@ describe('DataAnonymizationService', () => {
     it('should delete user data successfully', async () => {
       userRepository.findById.mockResolvedValue(mockUser);
       submissionRepository.deleteByUser.mockResolvedValue(undefined);
-      auditLogService.log.mockResolvedValue({
-        id: 'log-001',
-        timestamp: new Date(),
-        success: true,
-      });
+      auditLogService.log.mockResolvedValue(
+        createMockAuditLogEntity('user_data_anonymized'),
+      );
 
       const result = await service.deleteUserData('user-001', 'org-001');
 
@@ -338,11 +339,9 @@ describe('DataAnonymizationService', () => {
     it('should log audit entry with LGPD right to erasure metadata', async () => {
       userRepository.findById.mockResolvedValue(mockUser);
       submissionRepository.deleteByUser.mockResolvedValue(undefined);
-      auditLogService.log.mockResolvedValue({
-        id: 'log-001',
-        timestamp: new Date(),
-        success: true,
-      });
+      auditLogService.log.mockResolvedValue(
+        createMockAuditLogEntity('user_data_anonymized'),
+      );
 
       await service.deleteUserData('user-001', 'org-001');
 
@@ -366,11 +365,9 @@ describe('DataAnonymizationService', () => {
         limit: 10000,
         totalPages: 1,
       });
-      auditLogService.log.mockResolvedValue({
-        id: 'log-001',
-        timestamp: new Date(),
-        success: true,
-      });
+      auditLogService.log.mockResolvedValue(
+        createMockAuditLogEntity('user_data_anonymized'),
+      );
 
       // Test all three operations
       await service.anonymizeUserData('user-001', 'org-001');
@@ -399,11 +396,9 @@ describe('DataAnonymizationService', () => {
         limit: 10000,
         totalPages: 0,
       });
-      auditLogService.log.mockResolvedValue({
-        id: 'log-001',
-        timestamp: new Date(),
-        success: true,
-      });
+      auditLogService.log.mockResolvedValue(
+        createMockAuditLogEntity('user_data_anonymized'),
+      );
 
       await service.anonymizeUserData('user-001', 'org-001');
       await service.exportUserData('user-001', 'org-001');
