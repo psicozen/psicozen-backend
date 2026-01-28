@@ -17,3 +17,7 @@ export type {
 } from './alert.repository.interface';
 
 export { EMOCIOGRAMA_ALERT_REPOSITORY } from './alert.repository.interface';
+
+export type { IEmociogramaCategoryRepository } from './category.repository.interface';
+
+export { EMOCIOGRAMA_CATEGORY_REPOSITORY } from './category.repository.interface';

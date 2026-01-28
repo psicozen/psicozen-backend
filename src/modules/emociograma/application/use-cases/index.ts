@@ -16,3 +16,9 @@ export * from './get-alert-dashboard.use-case';
 export * from './resolve-alert.use-case';
 export * from './list-alerts.use-case';
 export * from './get-alert-by-id.use-case';
+
+// Category Use Cases
+export * from './list-categories.use-case';
+export * from './create-category.use-case';
+export * from './update-category.use-case';
+export * from './deactivate-category.use-case';
