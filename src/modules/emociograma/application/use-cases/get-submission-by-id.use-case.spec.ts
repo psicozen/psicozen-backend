@@ -115,7 +115,9 @@ describe('GetSubmissionByIdUseCase', () => {
         );
 
         // Assert
-        expect(submissionRepository.findById).toHaveBeenCalledWith(submissionId);
+        expect(submissionRepository.findById).toHaveBeenCalledWith(
+          submissionId,
+        );
         expect(result).toEqual(mockSubmission);
       });
 
@@ -238,7 +240,12 @@ describe('GetSubmissionByIdUseCase', () => {
 
         // Act & Assert
         await expect(
-          useCase.execute(submissionId, userId, organizationId, Role.COLABORADOR),
+          useCase.execute(
+            submissionId,
+            userId,
+            organizationId,
+            Role.COLABORADOR,
+          ),
         ).rejects.toThrow(NotFoundException);
       });
 

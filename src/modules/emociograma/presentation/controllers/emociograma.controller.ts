@@ -243,7 +243,10 @@ export class EmociogramaController {
   @ApiQuery({ name: 'categoryId', required: false, type: String })
   @ApiResponse({ status: 200, description: 'Relatório agregado retornado' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  @ApiResponse({ status: 403, description: 'Sem permissão - requer GESTOR ou ADMIN' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sem permissão - requer GESTOR ou ADMIN',
+  })
   async getTeamAggregated(
     @Headers('x-organization-id') organizationId: string,
     @Query() query: AggregatedReportDto,
@@ -275,7 +278,10 @@ export class EmociogramaController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({ status: 200, description: 'Submissões anonimizadas retornadas' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  @ApiResponse({ status: 403, description: 'Sem permissão - requer GESTOR ou ADMIN' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sem permissão - requer GESTOR ou ADMIN',
+  })
   async getTeamAnonymized(
     @Headers('x-organization-id') organizationId: string,
     @Query() pagination: PaginationDto,

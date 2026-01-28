@@ -16,7 +16,9 @@ describe('GetTeamSubmissionsUseCase', () => {
   const organizationId = 'org-123';
   const requesterId = 'requester-456';
 
-  const createMockSubmission = (overrides: Partial<EmociogramaSubmissionEntity> = {}) => {
+  const createMockSubmission = (
+    overrides: Partial<EmociogramaSubmissionEntity> = {},
+  ) => {
     const submission = Object.assign(new EmociogramaSubmissionEntity(), {
       id: 'sub-001',
       organizationId,
@@ -35,7 +37,11 @@ describe('GetTeamSubmissionsUseCase', () => {
 
   const mockSubmissions = [
     createMockSubmission({ id: 'sub-001', userId: 'user-1' }),
-    createMockSubmission({ id: 'sub-002', userId: 'user-2', isAnonymous: true }),
+    createMockSubmission({
+      id: 'sub-002',
+      userId: 'user-2',
+      isAnonymous: true,
+    }),
     createMockSubmission({ id: 'sub-003', userId: 'user-3' }),
   ];
 
@@ -91,7 +97,11 @@ describe('GetTeamSubmissionsUseCase', () => {
       mockRepository.findAll.mockResolvedValue(mockPaginatedResult);
 
       const pagination = new PaginationDto();
-      const result = await useCase.execute(organizationId, requesterId, pagination);
+      const result = await useCase.execute(
+        organizationId,
+        requesterId,
+        pagination,
+      );
 
       const anonymizedResult = result as AnonymizedPaginatedResult;
       expect(anonymizedResult.data).toBeDefined();
@@ -100,17 +110,19 @@ describe('GetTeamSubmissionsUseCase', () => {
 
     it('deve chamar maskIdentity em cada submissão quando anonymize=true', async () => {
       const submissionWithMask = createMockSubmission();
-      const maskSpy = jest.spyOn(submissionWithMask, 'maskIdentity').mockReturnValue({
-        id: 'sub-001',
-        organizationId,
-        userId: 'anonymous',
-        emotionLevel: 4,
-        emotionEmoji: '😊',
-        categoryId: 'cat-001',
-        isAnonymous: true,
-        commentFlagged: false,
-        submittedAt: new Date('2024-01-15T10:00:00Z'),
-      });
+      const maskSpy = jest
+        .spyOn(submissionWithMask, 'maskIdentity')
+        .mockReturnValue({
+          id: 'sub-001',
+          organizationId,
+          userId: 'anonymous',
+          emotionLevel: 4,
+          emotionEmoji: '😊',
+          categoryId: 'cat-001',
+          isAnonymous: true,
+          commentFlagged: false,
+          submittedAt: new Date('2024-01-15T10:00:00Z'),
+        });
 
       mockRepository.findAll.mockResolvedValue({
         data: [submissionWithMask],
@@ -130,7 +142,11 @@ describe('GetTeamSubmissionsUseCase', () => {
       mockRepository.findAll.mockResolvedValue(mockPaginatedResult);
 
       const pagination = new PaginationDto();
-      const result = await useCase.execute(organizationId, requesterId, pagination);
+      const result = await useCase.execute(
+        organizationId,
+        requesterId,
+        pagination,
+      );
 
       expect(result.total).toBe(3);
       expect(result.page).toBe(1);
@@ -180,7 +196,13 @@ describe('GetTeamSubmissionsUseCase', () => {
       const pagination = new PaginationDto();
       const filters = { department: 'Engineering' };
 
-      await useCase.execute(organizationId, requesterId, pagination, true, filters);
+      await useCase.execute(
+        organizationId,
+        requesterId,
+        pagination,
+        true,
+        filters,
+      );
 
       expect(mockRepository.findAll).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -197,7 +219,13 @@ describe('GetTeamSubmissionsUseCase', () => {
       const pagination = new PaginationDto();
       const filters = { team: 'Backend' };
 
-      await useCase.execute(organizationId, requesterId, pagination, true, filters);
+      await useCase.execute(
+        organizationId,
+        requesterId,
+        pagination,
+        true,
+        filters,
+      );
 
       expect(mockRepository.findAll).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -214,7 +242,13 @@ describe('GetTeamSubmissionsUseCase', () => {
       const pagination = new PaginationDto();
       const filters = { department: 'Engineering', team: 'Backend' };
 
-      await useCase.execute(organizationId, requesterId, pagination, true, filters);
+      await useCase.execute(
+        organizationId,
+        requesterId,
+        pagination,
+        true,
+        filters,
+      );
 
       expect(mockRepository.findAll).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -296,7 +330,9 @@ describe('GetTeamSubmissionsUseCase', () => {
       await useCase.execute(organizationId, requesterId, pagination);
 
       expect(logSpy).toHaveBeenCalledWith(
-        expect.stringContaining(`Buscando submissões da organização ${organizationId}`),
+        expect.stringContaining(
+          `Buscando submissões da organização ${organizationId}`,
+        ),
       );
     });
 

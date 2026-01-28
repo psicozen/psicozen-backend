@@ -107,7 +107,9 @@ describe('GetAnalyticsUseCase', () => {
     it('deve retornar analytics completo da organização', async () => {
       mockRepository.getMostMotivated.mockResolvedValue(mockMostMotivated);
       mockRepository.getLeastMotivated.mockResolvedValue(mockLeastMotivated);
-      mockRepository.getAggregatedByTimeRange.mockResolvedValue(mockAggregatedData);
+      mockRepository.getAggregatedByTimeRange.mockResolvedValue(
+        mockAggregatedData,
+      );
 
       const query: AnalyticsQueryDto = { startDate, endDate };
 
@@ -124,33 +126,51 @@ describe('GetAnalyticsUseCase', () => {
     it('deve usar limite padrão de 10 quando não especificado', async () => {
       mockRepository.getMostMotivated.mockResolvedValue([]);
       mockRepository.getLeastMotivated.mockResolvedValue([]);
-      mockRepository.getAggregatedByTimeRange.mockResolvedValue(mockAggregatedData);
+      mockRepository.getAggregatedByTimeRange.mockResolvedValue(
+        mockAggregatedData,
+      );
 
       const query: AnalyticsQueryDto = { startDate, endDate };
 
       await useCase.execute(organizationId, query);
 
-      expect(mockRepository.getMostMotivated).toHaveBeenCalledWith(organizationId, 10);
-      expect(mockRepository.getLeastMotivated).toHaveBeenCalledWith(organizationId, 10);
+      expect(mockRepository.getMostMotivated).toHaveBeenCalledWith(
+        organizationId,
+        10,
+      );
+      expect(mockRepository.getLeastMotivated).toHaveBeenCalledWith(
+        organizationId,
+        10,
+      );
     });
 
     it('deve usar limite personalizado quando especificado', async () => {
       mockRepository.getMostMotivated.mockResolvedValue([]);
       mockRepository.getLeastMotivated.mockResolvedValue([]);
-      mockRepository.getAggregatedByTimeRange.mockResolvedValue(mockAggregatedData);
+      mockRepository.getAggregatedByTimeRange.mockResolvedValue(
+        mockAggregatedData,
+      );
 
       const query: AnalyticsQueryDto = { startDate, endDate, limit: 5 };
 
       await useCase.execute(organizationId, query);
 
-      expect(mockRepository.getMostMotivated).toHaveBeenCalledWith(organizationId, 5);
-      expect(mockRepository.getLeastMotivated).toHaveBeenCalledWith(organizationId, 5);
+      expect(mockRepository.getMostMotivated).toHaveBeenCalledWith(
+        organizationId,
+        5,
+      );
+      expect(mockRepository.getLeastMotivated).toHaveBeenCalledWith(
+        organizationId,
+        5,
+      );
     });
 
     it('deve chamar getAggregatedByTimeRange com parâmetros corretos', async () => {
       mockRepository.getMostMotivated.mockResolvedValue([]);
       mockRepository.getLeastMotivated.mockResolvedValue([]);
-      mockRepository.getAggregatedByTimeRange.mockResolvedValue(mockAggregatedData);
+      mockRepository.getAggregatedByTimeRange.mockResolvedValue(
+        mockAggregatedData,
+      );
 
       const query: AnalyticsQueryDto = { startDate, endDate };
 
@@ -166,7 +186,9 @@ describe('GetAnalyticsUseCase', () => {
     it('deve executar buscas em paralelo para performance', async () => {
       mockRepository.getMostMotivated.mockResolvedValue(mockMostMotivated);
       mockRepository.getLeastMotivated.mockResolvedValue(mockLeastMotivated);
-      mockRepository.getAggregatedByTimeRange.mockResolvedValue(mockAggregatedData);
+      mockRepository.getAggregatedByTimeRange.mockResolvedValue(
+        mockAggregatedData,
+      );
 
       const query: AnalyticsQueryDto = { startDate, endDate };
 
@@ -194,7 +216,9 @@ describe('GetAnalyticsUseCase', () => {
 
       mockRepository.getMostMotivated.mockResolvedValue([]);
       mockRepository.getLeastMotivated.mockResolvedValue([]);
-      mockRepository.getAggregatedByTimeRange.mockResolvedValue(trendDataWithVariation);
+      mockRepository.getAggregatedByTimeRange.mockResolvedValue(
+        trendDataWithVariation,
+      );
 
       const query: AnalyticsQueryDto = { startDate, endDate };
       const result = await useCase.execute(organizationId, query);
@@ -217,7 +241,9 @@ describe('GetAnalyticsUseCase', () => {
 
       mockRepository.getMostMotivated.mockResolvedValue([]);
       mockRepository.getLeastMotivated.mockResolvedValue([]);
-      mockRepository.getAggregatedByTimeRange.mockResolvedValue(trendDataWithVariation);
+      mockRepository.getAggregatedByTimeRange.mockResolvedValue(
+        trendDataWithVariation,
+      );
 
       const query: AnalyticsQueryDto = { startDate, endDate };
       const result = await useCase.execute(organizationId, query);
@@ -257,7 +283,9 @@ describe('GetAnalyticsUseCase', () => {
 
       mockRepository.getMostMotivated.mockResolvedValue([]);
       mockRepository.getLeastMotivated.mockResolvedValue([]);
-      mockRepository.getAggregatedByTimeRange.mockResolvedValue(trendDataWithDays);
+      mockRepository.getAggregatedByTimeRange.mockResolvedValue(
+        trendDataWithDays,
+      );
 
       const query: AnalyticsQueryDto = { startDate, endDate };
       const result = await useCase.execute(organizationId, query);
@@ -344,10 +372,15 @@ describe('GetAnalyticsUseCase', () => {
     it('deve retornar estrutura completa de AnalyticsResponse', async () => {
       mockRepository.getMostMotivated.mockResolvedValue(mockMostMotivated);
       mockRepository.getLeastMotivated.mockResolvedValue(mockLeastMotivated);
-      mockRepository.getAggregatedByTimeRange.mockResolvedValue(mockAggregatedData);
+      mockRepository.getAggregatedByTimeRange.mockResolvedValue(
+        mockAggregatedData,
+      );
 
       const query: AnalyticsQueryDto = { startDate, endDate };
-      const result: AnalyticsResponse = await useCase.execute(organizationId, query);
+      const result: AnalyticsResponse = await useCase.execute(
+        organizationId,
+        query,
+      );
 
       // Verificar estrutura period
       expect(result.period).toHaveProperty('startDate');

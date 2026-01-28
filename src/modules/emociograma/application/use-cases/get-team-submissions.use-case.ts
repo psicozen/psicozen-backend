@@ -50,8 +50,7 @@ export class GetTeamSubmissionsUseCase {
     anonymize: boolean = true,
     filters?: { department?: string; team?: string },
   ): Promise<
-    | PaginatedResult<EmociogramaSubmissionEntity>
-    | AnonymizedPaginatedResult
+    PaginatedResult<EmociogramaSubmissionEntity> | AnonymizedPaginatedResult
   > {
     this.logger.log(
       `Buscando submissões da organização ${organizationId} - anonymize: ${anonymize}`,
